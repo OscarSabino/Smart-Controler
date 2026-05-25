@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Controller</title>
+    <!-- Estilos de la pagina -->
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+    <!-- Barra de navegacion para moverse entre paginas -->
+    <nav class="nav">
+        <a href="index.html">Inicio</a>
+        <a href="dispositivos.html">Dispositivos</a>
+        <a href="comandos.html">Comandos</a>
+        <a href="control.html">Control Remoto</a>
+        <a href="programaciones.html">Programaciones</a>
+    </nav>
+
+    <div class="container">
+        <!-- Titulo principal de la pagina -->
+        <h1>Smart Controller</h1>
+        <p>Sistema para controlar dispositivos IR y RF desde el ordenador</p>
+
+        <!-- Tarjetas con enlaces rapidos a las secciones principales -->
+        <div class="cards">
+            <!-- Tarjeta para ir a dispositivos -->
+            <div class="card" onclick="location.href='dispositivos.html'">
+                <h3>Dispositivos</h3>
+                <p>Gestiona tus dispositivos (TV, AC, luces...)</p>
+            </div>
+
+            <!-- Tarjeta para ir a comandos -->
+            <div class="card" onclick="location.href='comandos.html'">
+                <h3>Comandos</h3>
+                <p>Configura los botones de cada dispositivo</p>
+            </div>
+
+            <!-- Tarjeta para ir al control remoto -->
+            <div class="card" onclick="location.href='control.html'">
+                <h3>Control Remoto</h3>
+                <p>Envía señales a tus dispositivos</p>
+            </div>
+
+            <!-- Tarjeta para ir a programaciones -->
+            <div class="card" onclick="location.href='programaciones.html'">
+                <h3>Programaciones</h3>
+                <p>Programa comandos por día y hora</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Cargamos el JavaScript principal -->
+    <script src="js/main.js"></script>
+</body>
+</html>

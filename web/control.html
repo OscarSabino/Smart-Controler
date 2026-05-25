@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Control Remoto - Smart Controller</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+    <nav class="nav">
+        <a href="index.html">Inicio</a>
+        <a href="dispositivos.html">Dispositivos</a>
+        <a href="comandos.html">Comandos</a>
+        <a href="control.html">Control Remoto</a>
+        <a href="programaciones.html">Programaciones</a>
+    </nav>
+
+    <div class="container">
+
+        <h1>Control Remoto</h1>
+        <p>Selecciona un dispositivo y pulsa los botones para enviar señales</p>
+
+        <!-- Selector de dispositivo -->
+        <div class="form-box">
+            <label>Dispositivo:</label>
+            <select id="sel-dispositivo" onchange="cargarBotones()">
+                <option value="">-- Selecciona --</option>
+            </select>
+        </div>
+
+        <!-- Aqui se generan los botones de cada comando -->
+        <div id="controles" class="controles">
+            <p>Selecciona un dispositivo para ver sus comandos</p>
+        </div>
+
+        <!-- Mensaje de confirmacion o error al enviar -->
+        <div id="mensaje" class="mensaje"></div>
+
+    </div>
+
+    <script src="js/main.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            cargarDispositivosEnSelect('sel-dispositivo');
+        });
+    </script>
+</body>
+</html>

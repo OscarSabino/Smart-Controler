@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dispositivos - Smart Controller</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+    <!-- Menu de navegacion -->
+    <nav class="nav">
+        <a href="index.html">Inicio</a>
+        <a href="dispositivos.html">Dispositivos</a>
+        <a href="comandos.html">Comandos</a>
+        <a href="control.html">Control Remoto</a>
+        <a href="programaciones.html">Programaciones</a>
+    </nav>
+
+    <div class="container">
+
+        <h1>Dispositivos</h1>
+
+        <!-- Formulario para añadir un dispositivo nuevo -->
+        <div class="form-box">
+            <h3>Añadir Dispositivo</h3>
+            <input type="text" id="inp-nombre" placeholder="Nombre (ej: TV Salón)">
+            <input type="text" id="inp-marca" placeholder="Marca (opcional)">
+            <input type="text" id="inp-modelo" placeholder="Modelo (opcional)">
+
+            <!-- Selector de tipo: IR o RF -->
+            <select id="inp-tipo">
+                <option value="IR">IR (Infrarrojo)</option>
+                <option value="RF">RF (Radiofrecuencia)</option>
+            </select>
+
+            <!-- Boton para guardar el dispositivo -->
+            <button onclick="guardarDispositivo()">Guardar</button>
+        </div>
+
+        <!-- Tabla donde se muestran los dispositivos guardados -->
+        <h3>Dispositivos Guardados</h3>
+        <table id="tabla-dispositivos">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Nombre</th>
+                    <th>Tipo</th>
+                    <th>Marca</th>
+                    <th>Modelo</th>
+                    <th>Acción</th>
+                </tr>
+            </thead>
+            <tbody id="tbody-dispositivos">
+                <!-- Aqui se cargan los dispositivos desde JavaScript -->
+            </tbody>
+        </table>
+
+    </div>
+
+    <script src="js/main.js"></script>
+    <script>
+        // Cuando la pagina carga, traemos los dispositivos de la API
+        document.addEventListener('DOMContentLoaded', cargarDispositivos);
+    </script>
+</body>
+</html>

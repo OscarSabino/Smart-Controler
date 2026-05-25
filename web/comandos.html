@@ -1,0 +1,93 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Comandos - Smart Controller</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+    <nav class="nav">
+        <a href="index.html">Inicio</a>
+        <a href="dispositivos.html">Dispositivos</a>
+        <a href="comandos.html">Comandos</a>
+        <a href="control.html">Control Remoto</a>
+        <a href="programaciones.html">Programaciones</a>
+    </nav>
+
+    <div class="container">
+
+        <h1>Comandos</h1>
+
+        <!-- Formulario para añadir un comando a un dispositivo -->
+        <div class="form-box">
+            <h3>Añadir Comando</h3>
+
+            <!-- Seleccionamos a que dispositivo pertenece el comando -->
+            <select id="inp-cmd-dispositivo">
+                <option value="">-- Selecciona un dispositivo --</option>
+            </select>
+
+            <input type="text" id="inp-cmd-nombre" placeholder="Nombre (ej: Encender)">
+
+            <!-- Input del codigo con boton para escanear -->
+            <label>Código:</label>
+            <div class="input-group">
+                <input type="text" id="inp-cmd-codigo" placeholder="Ej: NEC:0xFF00FF00" style="flex:1;">
+                <button id="btn-escanear" onclick="escanearCodigo()">Escanear</button>
+                <button id="btn-cancelar-scan" onclick="cancelarEscaneo()" style="display:none;">Cancelar</button>
+            </div>
+            <div id="msg-escanear" class="msg-scan"></div>
+            <div id="countdown-display" class="countdown-scan" style="display:none;">Tiempo restante: 30s</div>
+
+            <!-- Selector de protocolo: IR o RF -->
+            <select id="inp-cmd-protocolo">
+                <option value="IR">IR (Infrarrojo)</option>
+                <option value="RF">RF (Radiofrecuencia)</option>
+            </select>
+
+            <button onclick="guardarComando()">Guardar</button>
+        </div>
+
+        <!-- Tabla de comandos -->
+        <h3>Comandos Guardados</h3>
+
+        <!-- Filtro para ver comandos de un dispositivo especifico -->
+        <div class="filtro">
+            <label>Filtrar por dispositivo:</label>
+            <select id="filtro-dispositivo" onchange="cargarComandos()">
+                <option value="">-- Todos --</option>
+            </select>
+        </div>
+
+        <table id="tabla-comandos">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Dispositivo</th>
+                    <th>Nombre</th>
+                    <th>Protocolo</th>
+                    <th>Código</th>
+                    <th>Acción</th>
+                </tr>
+            </thead>
+            <tbody id="tbody-comandos">
+                <!-- Aqui se cargan los comandos -->
+            </tbody>
+        </table>
+
+    </div>
+
+    <script src="js/main.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Cargamos los dispositivos en los dos selects (el de añadir y el de filtrar)
+            cargarDispositivosEnSelect('inp-cmd-dispositivo');
+            cargarDispositivosEnSelect('filtro-dispositivo');
+            // Cargamos los comandos
+            cargarComandos();
+        });
+    </script>
+</body>
+</html>

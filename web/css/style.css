@@ -1,0 +1,263 @@
+/* Estilos del Smart Controller */
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: Arial, sans-serif;
+    background: #f0f2f5;
+    color: #333;
+}
+
+.container {
+    max-width: 900px;
+    margin: 20px auto;
+    padding: 20px;
+}
+
+.nav {
+    background: #1a73e8;
+    padding: 12px;
+    text-align: center;
+}
+
+.nav a {
+    color: white;
+    text-decoration: none;
+    padding: 8px 16px;
+}
+
+.nav a:hover {
+    background: #1557b0;
+    border-radius: 4px;
+}
+
+h1 {
+    color: #1a73e8;
+    margin-bottom: 10px;
+}
+
+.form-box {
+    background: white;
+    padding: 20px;
+    border-radius: 8px;
+    margin-bottom: 20px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+input, select {
+    width: 100%;
+    padding: 10px;
+    margin-bottom: 10px;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 14px;
+}
+
+button {
+    background: #1a73e8;
+    color: white;
+    border: none;
+    padding: 10px 20px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 14px;
+}
+
+button:hover {
+    background: #1557b0;
+}
+
+table {
+    width: 100%;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+th, td {
+    padding: 10px 12px;
+    text-align: left;
+    border-bottom: 1px solid #eee;
+}
+
+th {
+    background: #f8f9fa;
+}
+
+table button {
+    background: #e74c3c;
+    padding: 5px 10px;
+    font-size: 12px;
+}
+
+.controles {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 20px;
+}
+
+.btn-comando {
+    background: #27ae60;
+    color: white;
+    border: none;
+    padding: 15px 25px;
+    border-radius: 8px;
+    font-size: 16px;
+    cursor: pointer;
+}
+
+.btn-comando:hover {
+    background: #219a52;
+}
+
+.mensaje {
+    margin-top: 15px;
+    padding: 10px;
+    border-radius: 4px;
+    text-align: center;
+}
+
+.mensaje-ok {
+    background: #d4edda;
+    color: #155724;
+}
+
+.mensaje-error {
+    background: #f8d7da;
+    color: #721c24;
+}
+
+.cards {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 15px;
+    margin-top: 30px;
+}
+
+.card {
+    background: white;
+    padding: 25px;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    flex: 1 1 200px;
+    cursor: pointer;
+    text-align: center;
+}
+
+.card:hover {
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+}
+
+.filtro {
+    margin-bottom: 15px;
+}
+
+.mensaje-enviando {
+    background: #ffeaa7;
+    color: #856404;
+}
+
+/* Grupo input + boton (para escanear codigo) */
+.input-group {
+    display: flex;
+    gap: 5px;
+    margin-bottom: 10px;
+}
+
+.input-group input {
+    margin-bottom: 0;
+}
+
+#btn-escanear {
+    background: #f39c12;
+    white-space: nowrap;
+}
+
+#btn-escanear:hover {
+    background: #d68910;
+}
+
+#btn-escanear:disabled {
+    background: #ccc;
+    cursor: not-allowed;
+}
+
+.btn-cancelar {
+    background: #e74c3c !important;
+}
+
+.btn-cancelar:hover {
+    background: #c0392b !important;
+}
+
+.msg-scan {
+    font-size: 13px;
+    margin-bottom: 10px;
+    padding: 5px 8px;
+    border-radius: 4px;
+}
+
+.msg-escuchando {
+    color: #856404;
+    background: #ffeaa7;
+}
+
+.msg-ok {
+    color: #155724;
+    background: #d4edda;
+}
+
+.msg-error {
+    color: #721c24;
+    background: #f8d7da;
+}
+
+.countdown-scan {
+    font-size: 14px;
+    font-weight: bold;
+    color: #e74c3c;
+    margin-bottom: 10px;
+    padding: 5px 8px;
+    border-radius: 4px;
+    background: #fdf2f2;
+    text-align: center;
+}
+
+#btn-cancelar-scan {
+    background: #e74c3c;
+    white-space: nowrap;
+}
+
+#btn-cancelar-scan:hover {
+    background: #c0392b;
+}
+
+#log-container {
+    margin-top: 20px;
+}
+
+#log-ejecuciones {
+    max-height: 300px;
+    overflow-y: auto;
+    font-size: 13px;
+}
+
+.log-item {
+    padding: 6px 10px;
+    border-bottom: 1px solid #eee;
+}
+
+.log-ok {
+    color: #155724;
+    background: #d4edda;
+}
+
+.log-error {
+    color: #721c24;
+    background: #f8d7da;
+}

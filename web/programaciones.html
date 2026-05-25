@@ -1,0 +1,111 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Programaciones - Smart Controller</title>
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+    <nav class="nav">
+        <a href="index.html">Inicio</a>
+        <a href="dispositivos.html">Dispositivos</a>
+        <a href="comandos.html">Comandos</a>
+        <a href="control.html">Control Remoto</a>
+        <a href="programaciones.html">Programaciones</a>
+    </nav>
+
+    <div class="container">
+
+        <h1>Programaciones</h1>
+
+        <!-- Formulario para añadir una programacion -->
+        <div class="form-box">
+            <h3>Añadir Programación</h3>
+
+            <!-- Seleccionamos el dispositivo primero -->
+            <label>Dispositivo:</label>
+            <select id="inp-prog-dispositivo" onchange="filtrarComandosPorDispositivo()">
+                <option value="">-- Selecciona un dispositivo --</option>
+            </select>
+
+            <!-- Seleccionamos el comando (se filtra por dispositivo) -->
+            <label>Comando:</label>
+            <select id="inp-prog-comando">
+                <option value="">-- Primero selecciona un dispositivo --</option>
+            </select>
+
+            <!-- Seleccionamos el dia de la semana -->
+            <label>Día:</label>
+            <select id="inp-prog-dia">
+                <option value="L">Lunes</option>
+                <option value="M">Martes</option>
+                <option value="X">Miércoles</option>
+                <option value="J">Jueves</option>
+                <option value="V">Viernes</option>
+                <option value="S">Sábado</option>
+                <option value="D">Domingo</option>
+                <option value="TODOS">Todos los días</option>
+            </select>
+
+            <!-- Seleccionamos la hora -->
+            <label>Hora:</label>
+            <input type="time" id="inp-prog-hora">
+
+            <button onclick="guardarProgramacion()">Guardar</button>
+        </div>
+
+        <!-- Filtro por dia -->
+        <div class="filtro">
+            <label>Filtrar por día:</label>
+            <select id="filtro-dia" onchange="cargarProgramaciones()">
+                <option value="">-- Todos --</option>
+                <option value="L">Lunes</option>
+                <option value="M">Martes</option>
+                <option value="X">Miércoles</option>
+                <option value="J">Jueves</option>
+                <option value="V">Viernes</option>
+                <option value="S">Sábado</option>
+                <option value="D">Domingo</option>
+            </select>
+        </div>
+
+        <!-- Tabla de programaciones -->
+        <table id="tabla-programaciones">
+            <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Dispositivo</th>
+                    <th>Comando</th>
+                    <th>Día</th>
+                    <th>Hora</th>
+                    <th>Activo</th>
+                    <th>Acción</th>
+                </tr>
+            </thead>
+            <tbody id="tbody-programaciones">
+                <!-- Aqui se cargan las programaciones -->
+            </tbody>
+        </table>
+
+        <!-- Log de ejecuciones -->
+        <div class="form-box" id="log-container">
+            <h3>Ejecuciones Recientes</h3>
+            <div id="log-ejecuciones">
+                <div class="log-item">Esperando ejecuciones...</div>
+            </div>
+        </div>
+
+    </div>
+
+    <script src="js/main.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            cargarDispositivosEnSelect('inp-prog-dispositivo');
+            cargarProgramaciones();
+            iniciarVerificadorProgramaciones();
+        });
+    </script>
+</body>
+</html>
