@@ -609,10 +609,10 @@ function ejecutarProgramacionAhora(id, btn) {
             });
             if (ejecucionesRecientes.length > 50) ejecucionesRecientes.length = 50;
             actualizarEjecuciones();
-            alert(respuesta.exito ? "Comando enviado" : "Error: " + respuesta.mensaje);
+            console.log(respuesta.exito ? "Comando enviado" : "Error: " + respuesta.mensaje);
         })
         .catch(function(error) {
-            alert("Error de conexion: " + error.message);
+            console.log("Error de conexion");
         })
         .finally(function() {
             btn.disabled = false;
