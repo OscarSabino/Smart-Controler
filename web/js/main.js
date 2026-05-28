@@ -292,7 +292,7 @@ function escanearCodigo() {
                     msg.className = "msg-scan msg-error";
                 }
             } else {
-                msg.textContent = "Error: Al recibir la señal......";
+                msg.textContent = "Error: Al recibir la señal...";
                 msg.className = "msg-scan msg-error";
             }
         })
