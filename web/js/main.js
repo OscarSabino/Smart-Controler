@@ -620,6 +620,7 @@ function ejecutarProgramacionAhora(id, btn) {
         });
 }
 
+
 // Cada 30s revisa si hay programaciones pendientes
 function verificarProgramaciones() {
     fetch(API_URL + "/ejecutar-programaciones.php")
