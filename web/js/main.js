@@ -612,7 +612,7 @@ function ejecutarProgramacionAhora(id, btn) {
             console.log(respuesta.exito ? "Comando enviado" : "Error: " + respuesta.mensaje);
         })
         .catch(function(error) {
-            console.log("Error de conexion");
+            console.error("Error de conexion");
         })
         .finally(function() {
             btn.disabled = false;
