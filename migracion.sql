@@ -1,1 +1,0 @@
-ALTER TABLE programaciones ADD COLUMN IF NOT EXISTS ultima_ejecucion DATETIME DEFAULT NULL;

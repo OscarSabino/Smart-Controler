@@ -101,3 +101,6 @@ INSERT INTO escenas (nombre) VALUES ('Ver Pelicula');
 INSERT INTO escena_comandos (id_escena, id_comando) VALUES
 (1, 1),  -- Encender TV
 (1, 5);  -- Encender AC
+
+
+ALTER TABLE programaciones ADD COLUMN IF NOT EXISTS ultima_ejecucion DATETIME DEFAULT NULL;
