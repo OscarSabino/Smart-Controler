@@ -71,7 +71,7 @@ echo json_encode([
     "comando" => $fila["comando_nombre"],
     "dispositivo" => $fila["dispositivo_nombre"],
     "exito" => $exito,
-    "mensaje" => $exito ? ($respuesta_json["mensaje"] ?? "Enviado") : ($respuesta_json["error"] ?? "Error de conexion con el servidor Python")
+    "mensaje" => $exito ? ($respuesta_json["mensaje"] ?? "Enviado") : ($respuesta_json["error"] ?? "Error de conexion con el servidor")
 ]);
 
 $conn->close();
