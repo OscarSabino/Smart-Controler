@@ -230,7 +230,7 @@ function escanearCodigo() {
     btn.textContent = "Escaneando...";
     btnCancelar.style.display = "inline-block";
     input.value = "";
-    msg.textContent = "Esperando señal IR...";
+    msg.textContent = "Esperando señal...";
     msg.className = "msg-scan msg-escuchando";
     countdownDisplay.style.display = "block";
     countdownDisplay.textContent = "Tiempo restante: " + segundosRestantes + "s";
@@ -292,7 +292,7 @@ function escanearCodigo() {
                     msg.className = "msg-scan msg-error";
                 }
             } else {
-                msg.textContent = "Error: " + error.message;
+                msg.textContent = "Error: Al recibir la señal...";
                 msg.className = "msg-scan msg-error";
             }
         })
