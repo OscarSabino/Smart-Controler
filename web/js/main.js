@@ -418,7 +418,7 @@ function enviarComando(protocolo, codigo) {
             }
         })
         .catch(function(error) {
-            mensajeDiv.textContent = "✗ Error de conexion con el servidor Python";
+            mensajeDiv.textContent = "✗ Error de conexion con el servidor local de Python: ";
             mensajeDiv.className = "mensaje mensaje-error";
             console.error("Error al enviar:", error);
         });
