@@ -1,95 +1,159 @@
 /*
- * Smart Controller para Arduino
- * Recibe comandos por Bluetooth y controla IR/RF
- */
+  ---------------------------------------------------------
+  SMART CONTROLLER – Código Arduino (Versión Estudiante)
+  Autor: Óscar
+  Descripción:
+  Este programa permite:
+    - Capturar señales IR (infrarrojas)
+    - Reproducir señales IR
+    - Capturar señales RF (433 MHz)
+    - Reproducir señales RF
+    - Recibir comandos desde Bluetooth HC‑05
+  ---------------------------------------------------------
+*/
 
+// Librería para señales IR
 #include <IRremote.h>
 
-// Pines
-int PIN_IR = 3;    // LED infrarrojo
-int PIN_RF = 4;    // Modulo RF
+// Librería para señales RF 433 MHz
+#include <RCSwitch.h>
 
-// Receptor IR para aprender codigos
-IRrecv irrecv(5);
+// Librería para comunicación Bluetooth por software
+#include <SoftwareSerial.h>
 
-// Modo escaneo
-bool escaneando = false;
-unsigned long inicioScan = 0;
+// -------------------- CONFIGURACIÓN DE PINES --------------------
 
+// Receptor IR (VS1838B)
+#define PIN_IR_RECV 2
+
+// Emisor IR (LED IR + transistor PN2222)
+#define PIN_IR_SEND 3
+
+// Emisor RF (FS1000A)
+#define PIN_RF_SEND 4
+
+// Receptor RF (XY-MK-5V)
+#define PIN_RF_RECV 5
+
+// Bluetooth HC‑05 (SoftwareSerial)
+#define BT_RX 10   // HC‑05 TX → Arduino RX
+#define BT_TX 11   // HC‑05 RX ← Arduino TX (con divisor de tensión)
+
+// -------------------- OBJETOS DE LIBRERÍAS --------------------
+
+// Objeto para recibir IR
+IRrecv irrecv(PIN_IR_RECV);
+
+// Objeto para enviar IR
+IRsend irsend(PIN_IR_SEND);
+
+// Estructura donde se guarda el código IR recibido
+decode_results results;
+
+// Objeto para RF
+RCSwitch rfSwitch = RCSwitch();
+
+// Objeto para Bluetooth
+SoftwareSerial BT(BT_RX, BT_TX);
+
+// Variables donde guardamos el último código capturado
+unsigned long ultimoIR = 0;
+unsigned long ultimoRF = 0;
+
+
+// -------------------- SETUP --------------------
 void setup() {
-    Serial.begin(9600);
 
-    pinMode(PIN_RF, OUTPUT);
-    digitalWrite(PIN_RF, LOW);
+  // Monitor serie para depuración
+  Serial.begin(9600);
 
-    IrSender.begin(PIN_IR);
+  // Bluetooth HC‑05 a 9600 baudios
+  BT.begin(9600);
 
-    Serial.println("Listo");
+  // Activar receptor IR
+  irrecv.enableIRIn();
+
+  // Activar emisor RF
+  rfSwitch.enableTransmit(PIN_RF_SEND);
+
+  // Activar receptor RF
+  rfSwitch.enableReceive(PIN_RF_RECV);
+
+  // Mensajes de inicio
+  Serial.println("Smart Controller iniciado.");
+  BT.println("HC-05 conectado. Listo en COM4.");
 }
 
+
+// -------------------- LOOP PRINCIPAL --------------------
 void loop() {
-    // Modo escaneo: esperamos una señal IR
-    if (escaneando) {
-        if (IrReceiver.decode()) {
-            unsigned long valor = IrReceiver.decodedIRData.decodedRawData;
-            if (valor == 0) {
-                valor = IrReceiver.decodedIRData.command;
-            }
 
-            Serial.print("OK:CODIGO:");
-            Serial.print("NEC:0x");
-            Serial.println(valor, HEX);
+  // ---------------------------------------------------------
+  // 1. CAPTURA DE SEÑAL IR
+  // ---------------------------------------------------------
+  if (irrecv.decode(&results)) {
 
-            IrReceiver.resume();
-            escaneando = false;
-            irrecv.disableIRIn();
-            return;
-        }
+    // Guardamos el código IR recibido
+    ultimoIR = results.value;
 
-        // Timeout 30 segundos
-        if (millis() - inicioScan > 30000) {
-            Serial.println("ERROR: Tiempo agotado");
-            escaneando = false;
-            irrecv.disableIRIn();
-            return;
-        }
+    // Mostramos por monitor serie
+    Serial.print("IR capturado: ");
+    Serial.println(ultimoIR, HEX);
+
+    // Enviamos el código por Bluetooth
+    BT.print("IR:");
+    BT.println(ultimoIR, HEX);
+
+    // Preparamos el receptor para la siguiente señal
+    irrecv.resume();
+  }
+
+
+  // ---------------------------------------------------------
+  // 2. CAPTURA DE SEÑAL RF
+  // ---------------------------------------------------------
+  if (rfSwitch.available()) {
+
+    // Guardamos el código RF recibido
+    ultimoRF = rfSwitch.getReceivedValue();
+
+    // Mostramos por monitor serie
+    Serial.print("RF capturado: ");
+    Serial.println(ultimoRF);
+
+    // Enviamos por Bluetooth
+    BT.print("RF:");
+    BT.println(ultimoRF);
+
+    // Limpiamos el buffer
+    rfSwitch.resetAvailable();
+  }
+
+
+  // ---------------------------------------------------------
+  // 3. COMANDOS RECIBIDOS POR BLUETOOTH
+  // ---------------------------------------------------------
+  if (BT.available()) {
+
+    // Leemos el comando enviado desde la app/web
+    String cmd = BT.readStringUntil('\n');
+    cmd.trim(); // Quitamos espacios y saltos
+
+    // ---- Reproducir IR ----
+    if (cmd == "SEND_IR") {
+      Serial.println("Enviando IR...");
+      irsend.sendNEC(ultimoIR, 32); // NEC es el protocolo más común
     }
 
-    // Leer comandos del Bluetooth
-    if (Serial.available() > 0) {
-        String trama = Serial.readStringUntil('\n');
-        trama.trim();
-
-        if (trama == "SCAN") {
-            escaneando = true;
-            inicioScan = millis();
-            irrecv.enableIRIn();
-            Serial.println("SCAN: Esperando...");
-        } else if (trama.length() > 0) {
-            // Buscamos los dos puntos
-            int pos = trama.indexOf(':');
-            if (pos > 0) {
-                String proto = trama.substring(0, pos);
-                String codigo = trama.substring(pos + 1);
-
-                if (proto == "IR") {
-                    int sep = codigo.indexOf(':');
-                    if (sep > 0) {
-                        String hex = codigo.substring(sep + 1);
-                        long val = strtol(hex.c_str(), NULL, 16);
-                        IrSender.sendNEC(val, 32);
-                        Serial.println("OK: IR enviado");
-                    }
-                } else if (proto == "RF") {
-                    for (int i = 0; i < 10; i++) {
-                        digitalWrite(PIN_RF, HIGH);
-                        delay(1);
-                        digitalWrite(PIN_RF, LOW);
-                        delay(1);
-                    }
-                    Serial.println("OK: RF enviado");
-                }
-            }
-        }
+    // ---- Reproducir RF ----
+    if (cmd == "SEND_RF") {
+      Serial.println("Enviando RF...");
+      rfSwitch.send(ultimoRF, 24); // 24 bits es lo más habitual
     }
+
+    // ---- Comando de prueba ----
+    if (cmd == "TEST") {
+      BT.println("OK desde Arduino");
+    }
+  }
 }
