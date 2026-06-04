@@ -15,7 +15,7 @@ if ($metodo == "GET") {
 
     // Si nos pasan un dia filtramos por ese dia
     if ($dia) {
-        $stmt = $conn->prepare("SELECT p.*, c.nombre AS comando, d.nombre AS dispositivo FROM programaciones p JOIN comandos c ON p.id_comando = c.id_comando JOIN dispositivos d ON c.id_dispositivo = d.id_dispositivo WHERE p.dia_semana = ? ORDER BY p.hora ASC");
+        $stmt = $conn->prepare("SELECT p.*, c.nombre AS comando, d.nombre AS dispositivo FROM programaciones p JOIN comandos c ON p.id_comando = c.id_comando JOIN dispositivos d ON c.id_dispositivo = d.id_dispositivo WHERE p.dia_semana = ? OR p.dia_semana = 'TODOS' ORDER BY p.hora ASC");
         $stmt->bind_param("s", $dia);
         $stmt->execute();
         $resultado = $stmt->get_result();
