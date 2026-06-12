@@ -1,0 +1,9 @@
+# Credenciales de base de datos
+api/config.php
+
+# Archivos generados / temporales
+*.log
+__pycache__/
+*.pyc
+.DS_Store
+Thumbs.db

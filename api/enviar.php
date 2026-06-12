@@ -34,14 +34,25 @@ if (!$comando) {
     exit();
 }
 
+// Validamos protocolo y codigo antes de pasarlos a PowerShell
+$protocolo = strtoupper($comando['protocolo']);
+$codigo = $comando['codigo'];
+if (!in_array($protocolo, ['IR', 'RF']) || !preg_match('/^[A-Fa-f0-9]+$/', $codigo)) {
+    http_response_code(400);
+    echo json_encode(["error" => "Protocolo o codigo invalido"]);
+    exit();
+}
+
 // Puerto COM donde esta conectado el HC-05 (cambiar segun tu PC)
 $puerto = getenv("BT_COM") ?: "COM4";
+$puerto_seguro = str_replace('"', '`"', $puerto);
 
 // Preparamos la trama que enviaremos al Arduino: PROTOCOLO:CODIGO
-$trama = $comando['protocolo'] . ":" . $comando['codigo'] . "\n";
+$trama = $protocolo . ":" . $codigo . "\n";
+$trama_segura = str_replace('"', '`"', $trama);
 
 // Enviamos la trama al Arduino usando PowerShell (abre el puerto serie, escribe y cierra)
-$comando_powershell = 'try { $p = New-Object System.IO.Ports.SerialPort("' . $puerto . '", 9600, None, 8, One); $p.Open(); $p.WriteLine("' . $trama . '"); $p.Close(); Write-Host "OK" } catch { Write-Host "ERROR" }';
+$comando_powershell = 'try { $p = New-Object System.IO.Ports.SerialPort("' . $puerto_seguro . '", 9600, None, 8, One); $p.Open(); $p.WriteLine("' . $trama_segura . '"); $p.Close(); Write-Host "OK" } catch { Write-Host "ERROR" }';
 $salida = shell_exec("powershell -NoProfile -Command \"" . $comando_powershell . "\" 2>&1");
 
 if (trim($salida) == "OK") {

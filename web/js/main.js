@@ -10,6 +10,13 @@ if (window.location.protocol == "file:") {
     var API_URL = "../api";
 }
 
+// Helper: escapar HTML para prevenir XSS
+function htmlEscape(str) {
+    var div = document.createElement("div");
+    div.appendChild(document.createTextNode(str));
+    return div.innerHTML;
+}
+
 // =============================================
 // FUNCIONES PARA DISPOSITIVOS
 // =============================================
@@ -32,10 +39,10 @@ function cargarDispositivos() {
                 // Ponemos los datos en cada celda
                 fila.innerHTML =
                     "<td>" + d.id_dispositivo + "</td>" +
-                    "<td>" + d.nombre + "</td>" +
-                    "<td>" + d.tipo + "</td>" +
-                    "<td>" + (d.marca || "-") + "</td>" +
-                    "<td>" + (d.modelo || "-") + "</td>" +
+                    "<td>" + htmlEscape(d.nombre) + "</td>" +
+                    "<td>" + htmlEscape(d.tipo) + "</td>" +
+                    "<td>" + htmlEscape(d.marca || "-") + "</td>" +
+                    "<td>" + htmlEscape(d.modelo || "-") + "</td>" +
                     "<td><button onclick='borrarDispositivo(" + d.id_dispositivo + ")'>Eliminar</button></td>";
 
                 tbody.appendChild(fila);
@@ -156,9 +163,9 @@ function cargarComandos() {
                 fila.innerHTML =
                     "<td>" + c.id_comando + "</td>" +
                     "<td>" + (c.id_dispositivo || "-") + "</td>" +
-                    "<td>" + c.nombre + "</td>" +
-                    "<td>" + c.protocolo + "</td>" +
-                    "<td>" + c.codigo + "</td>" +
+                    "<td>" + htmlEscape(c.nombre) + "</td>" +
+                    "<td>" + htmlEscape(c.protocolo) + "</td>" +
+                    "<td>" + htmlEscape(c.codigo) + "</td>" +
                     "<td><button onclick='borrarComando(" + c.id_comando + ")'>Eliminar</button></td>";
 
                 tbody.appendChild(fila);
@@ -223,7 +230,7 @@ function escanearCodigo() {
 
     escaneando = true;
     scanCancelado = false;
-    segundosRestantes = 30;
+    segundosRestantes = 35;
     var protocolo = document.getElementById("inp-cmd-protocolo").value;
 
     btn.disabled = true;
@@ -250,16 +257,6 @@ function escanearCodigo() {
 
     controlEscanear = new AbortController();
 
-    // Timeout de 5s si el servidor Python no responde
-    var timeoutConectar = setTimeout(function() {
-        if (!escaneando) return;
-        controlEscanear.abort();
-        msg.textContent = "Error: No se puede conectar con el servidor Python (localhost:5000)";
-        msg.className = "msg-scan msg-error";
-        alert("El servidor Python no esta funcionando.\nAbre una terminal y ejecuta: python servidor_bt.py");
-        finalizarEscaneo();
-    }, 5000);
-
     fetch("http://localhost:5000/escanear", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -267,7 +264,6 @@ function escanearCodigo() {
         signal: controlEscanear.signal
     })
         .then(function(r) {
-            clearTimeout(timeoutConectar);
             if (!escaneando) return;
             if (r.status == 408) {
                 return r.json().then(function(d) { throw new Error(d.error); });
@@ -284,15 +280,17 @@ function escanearCodigo() {
             msg.className = "msg-scan msg-ok";
         })
         .catch(function(error) {
-            clearTimeout(timeoutConectar);
             if (!escaneando) return;
             if (error.name == "AbortError") {
                 if (!scanCancelado) {
                     msg.textContent = "Error: Tiempo de espera agotado (30s)";
                     msg.className = "msg-scan msg-error";
                 }
+            } else if (!error.message || error.message == "Failed to fetch" || (typeof error.message == "string" && error.message.indexOf("NetworkError") >= 0)) {
+                msg.textContent = "Error: No se puede conectar con el servidor Python (localhost:5000)";
+                msg.className = "msg-scan msg-error";
             } else {
-                msg.textContent = "Error: Al recibir la señal...";
+                msg.textContent = error.message || "Error: Al recibir la señal...";
                 msg.className = "msg-scan msg-error";
             }
         })
@@ -498,10 +496,10 @@ function cargarProgramaciones() {
 
                 fila.innerHTML =
                     "<td>" + p.id_programacion + "</td>" +
-                    "<td>" + (p.dispositivo || "-") + "</td>" +
-                    "<td>" + (p.comando || "-") + "</td>" +
-                    "<td>" + diaNombre + "</td>" +
-                    "<td>" + p.hora.substring(0, 5) + "</td>" +
+                    "<td>" + htmlEscape(p.dispositivo || "-") + "</td>" +
+                    "<td>" + htmlEscape(p.comando || "-") + "</td>" +
+                    "<td>" + htmlEscape(diaNombre) + "</td>" +
+                    "<td>" + htmlEscape(p.hora.substring(0, 5)) + "</td>" +
                     "<td><input type='checkbox' " + checked + " onchange='toggleProgramacion(" + p.id_programacion + ", this.checked)'></td>" +
                     "<td><button onclick='ejecutarProgramacionAhora(" + p.id_programacion + ", this)' style='background:#27ae60; margin-right:5px;'>Ejecutar</button><button onclick='borrarProgramacion(" + p.id_programacion + ")'>Eliminar</button></td>";
 

@@ -1,6 +1,5 @@
 # Smart Controller - Guía de instalación
 
-Proyecto académico para controlar dispositivos IR y RF con Arduino Nano + HC-05.
 
 ## Estructura de carpetas
 

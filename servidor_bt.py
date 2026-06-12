@@ -2,28 +2,89 @@
 # -*- coding: utf-8 -*-
 
 # =============================================
-# Servidor Bluetooth para Smart Controller
+# Servidor de comunicacion para Smart Controller
 # Recibe comandos desde la web y los envia
-# al Arduino por Bluetooth (Serial)
+# al Arduino por USB o Bluetooth (Serial)
+# Soporta multiples puertos: USB + BT
 # =============================================
 
-from http.server import HTTPServer, BaseHTTPRequestHandler
+from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 import json
 import os
-import sys
 import time
 
 # =============================================
 # CONFIGURACION
 # =============================================
 
-PUERTO = 5000
-BT_COM = os.environ.get("BT_COM", "COM4")
+PUERTO_HTTP = 5000
+PUERTOS_SERIE = [
+    os.environ.get("USB_COM", "COM3"),    # USB - Arduino directo
+    os.environ.get("BT_COM", "COM4"),     # Bluetooth HC-05
+]
 BT_BAUD = 9600
-TIMEOUT_ESCANEO = 30  # segundos esperando codigo del Arduino
+TIMEOUT_ESCANEO = 30
 
-# Variable global para el puerto serie
-bt = None
+# Lista de puertos serie abiertos
+puertos_abiertos = []
+
+
+def abrir_todos_los_puertos():
+    global puertos_abiertos
+    import serial
+
+    for nombre in PUERTOS_SERIE:
+        try:
+            p = serial.Serial(nombre, BT_BAUD, timeout=1)
+            time.sleep(2)
+            puertos_abiertos.append(p)
+            print("  [+] " + nombre + " abierto")
+        except Exception as e:
+            print("  [-] " + nombre + ": " + str(e))
+
+
+def cerrar_todos_los_puertos():
+    global puertos_abiertos
+    for p in puertos_abiertos:
+        try:
+            if p and p.is_open:
+                p.close()
+        except:
+            pass
+    puertos_abiertos = []
+
+
+def puerto_activo():
+    """Devuelve el primer puerto disponible"""
+    for p in puertos_abiertos:
+        try:
+            if p and p.is_open:
+                return p
+        except:
+            pass
+    return None
+
+
+def enviar_a_arduino(trama):
+    """Envia un comando a TODOS los puertos abiertos"""
+    datos = trama.encode()
+    for p in puertos_abiertos:
+        try:
+            if p and p.is_open:
+                p.write(datos)
+        except:
+            pass
+
+
+def limpiar_buffers():
+    """Limpia buffers de entrada de todos los puertos"""
+    for p in puertos_abiertos:
+        try:
+            if p and p.is_open:
+                while p.in_waiting > 0:
+                    p.readline()
+        except:
+            pass
 
 
 # =============================================
@@ -37,7 +98,24 @@ class Manejador(BaseHTTPRequestHandler):
 
     def do_GET(self):
         if self.path == "/":
-            self.enviar_json({"mensaje": "Servidor Bluetooth funcionando", "puerto": BT_COM})
+            estado_puertos = {}
+            for nombre in PUERTOS_SERIE:
+                encontrado = False
+                for p in puertos_abiertos:
+                    try:
+                        if p and p.is_open and p.port == nombre:
+                            estado_puertos[nombre] = "conectado"
+                            encontrado = True
+                            break
+                    except:
+                        pass
+                if not encontrado:
+                    estado_puertos[nombre] = "desconectado"
+            self.enviar_json({
+                "mensaje": "Servidor funcionando",
+                "puertos": estado_puertos,
+                "total_conectados": len(puertos_abiertos)
+            })
         else:
             self.enviar_error(404, "Ruta no encontrada")
 
@@ -62,13 +140,23 @@ class Manejador(BaseHTTPRequestHandler):
                 self.enviar_error(400, "Falta el codigo del comando")
                 return
 
-            trama = protocolo + ":" + codigo + "\n"
-            print("Enviando: " + trama.strip())
+            p = puerto_activo()
+            if not p:
+                self.enviar_error(500, "No hay ningun puerto serie conectado")
+                return
 
-            if enviar_por_bluetooth(trama):
-                self.enviar_json({"mensaje": "Señal enviada correctamente", "protocolo": protocolo, "codigo": codigo})
+            if protocolo.upper() == "RF":
+                trama = "RF:" + codigo + "\n"
             else:
-                self.enviar_error(500, "No se pudo enviar. El Arduino no esta conectado en " + BT_COM)
+                trama = "IR:" + codigo + "\n"
+
+            enviar_a_arduino(trama)
+            print("Enviando: " + trama.strip())
+            self.enviar_json({
+                "mensaje": "Senial enviada correctamente",
+                "protocolo": protocolo,
+                "codigo": codigo
+            })
 
         except Exception as e:
             print("Error: " + str(e))
@@ -78,50 +166,66 @@ class Manejador(BaseHTTPRequestHandler):
     # ESCANEAR UN CODIGO DESDE EL ARDUINO
     # =============================================
     def escanear_codigo(self):
-        global bt
-
         try:
             datos = self.leer_json()
             protocolo = datos.get("protocolo", "IR")
         except:
             protocolo = "IR"
 
-        # Abrimos el puerto serie si no esta abierto
-        if not bt or not bt.is_open:
+        p = puerto_activo()
+        if not p:
+            self.enviar_error(500, "No hay ningun puerto serie conectado")
+            return
+
+        # Limpiamos el buffer de entrada
+        time.sleep(0.2)
+        try:
+            while p.in_waiting > 0:
+                p.readline()
+        except:
+            pass
+
+        # Enviamos SCAN:IR o SCAN:RF al Arduino
+        comando = "SCAN:" + protocolo.upper() + "\n"
+        try:
+            p.write(comando.encode())
+        except Exception as e:
+            self.enviar_error(500, "Error al escribir en puerto serie: " + str(e))
+            return
+        print("Modo SCAN activado. Esperando senal " + protocolo + "...")
+
+        inicio = time.time()
+        while time.time() - inicio < TIMEOUT_ESCANEO:
             try:
-                import serial
-                bt = serial.Serial(BT_COM, BT_BAUD, timeout=1)
+                if p.in_waiting > 0:
+                    linea = p.readline().decode("utf-8").strip()
+                    print("Arduino dice: " + linea)
+
+                    if linea.startswith(protocolo.upper() + ":"):
+                        codigo_hex = linea[3:]
+                        codigo_completo = protocolo + ":0x" + codigo_hex
+                        self.enviar_json({
+                            "codigo": codigo_completo,
+                            "protocolo": protocolo
+                        })
+                        return
+                    elif linea.startswith("OK:"):
+                        continue
+                    elif linea.startswith("ERROR"):
+                        if "TIMEOUT" in linea:
+                            self.enviar_error(408, "Señal no recibida en el tiempo de espera")
+                        else:
+                            self.enviar_error(400, "Error del Arduino: " + linea)
+                        return
             except Exception as e:
-                self.enviar_error(500, "No se puede abrir " + BT_COM + ": " + str(e))
+                self.enviar_error(500, "Error leyendo puerto serie: " + str(e))
                 return
 
-        # Enviamos SCAN al Arduino
-        print("Enviando SCAN al Arduino...")
-        bt.write(b"SCAN\n")
-        time.sleep(0.5)
+            time.sleep(0.1)
 
-        # Esperamos respuesta con timeout
-        inicio = time.time()
-        respuesta = ""
-        while time.time() - inicio < TIMEOUT_ESCANEO:
-            if bt.in_waiting > 0:
-                linea = bt.readline().decode("utf-8").strip()
-                print("Arduino dice: " + linea)
-                respuesta = linea
-
-                # Si el Arduino envia OK con el codigo
-                if respuesta.startswith("OK:CODIGO:"):
-                    codigo = respuesta[10:]  # Quitamos "OK:CODIGO:"
-                    self.enviar_json({"codigo": codigo, "protocolo": protocolo})
-                    return
-                elif respuesta.startswith("ERROR"):
-                    self.enviar_error(400, "Error del Arduino: " + respuesta)
-                    return
-            else:
-                time.sleep(0.1)
-
-        # Timeout
-        self.enviar_error(408, "Tiempo de espera agotado. No se recibio ningun codigo")
+        self.enviar_error(
+            408, "Tiempo de espera agotado. No se recibio ningun codigo"
+        )
 
     # =============================================
     # FUNCIONES AYUDANTES
@@ -141,36 +245,20 @@ class Manejador(BaseHTTPRequestHandler):
 
     def enviar_json(self, datos):
         self.enviar_headers(200)
-        self.wfile.write(json.dumps(datos).encode("utf-8"))
+        try:
+            self.wfile.write(json.dumps(datos).encode("utf-8"))
+        except (ConnectionAbortedError, BrokenPipeError):
+            pass
 
     def enviar_error(self, codigo, mensaje):
         self.enviar_headers(codigo)
-        self.wfile.write(json.dumps({"error": mensaje}).encode("utf-8"))
+        try:
+            self.wfile.write(json.dumps({"error": mensaje}).encode("utf-8"))
+        except (ConnectionAbortedError, BrokenPipeError):
+            pass
 
     def log_message(self, formato, *args):
         print(formato % args)
-
-
-# =============================================
-# ENVIAR COMANDO AL ARDUINO POR BLUETOOTH
-# =============================================
-
-def enviar_por_bluetooth(trama):
-    try:
-        import serial
-    except ImportError:
-        print("ERROR: pyserial no esta instalado. pip install pyserial")
-        return False
-
-    try:
-        bt_temp = serial.Serial(BT_COM, BT_BAUD, timeout=2)
-        bt_temp.write(trama.encode("utf-8"))
-        bt_temp.close()
-        print("OK: Comando enviado por " + BT_COM)
-        return True
-    except Exception as e:
-        print("ERROR al enviar por Bluetooth: " + str(e))
-        return False
 
 
 # =============================================
@@ -179,27 +267,48 @@ def enviar_por_bluetooth(trama):
 
 if __name__ == "__main__":
     print("====================================")
-    print("  SMART CONTROLLER - Servidor BT")
+    print("  SMART CONTROLLER - Servidor Serial")
     print("====================================")
     print("")
-    print("Escuchando en http://localhost:" + str(PUERTO))
-    print("Bluetooth en " + BT_COM)
+    print("Escuchando en http://localhost:" + str(PUERTO_HTTP))
+    print("Puertos serie configurados:")
+    for puerto in PUERTOS_SERIE:
+        print("  - " + puerto)
+    print("")
+    print("Conectando puertos serie...")
+    try:
+        abrir_todos_los_puertos()
+    except ImportError:
+        print("  ERROR: pyserial no instalado. Ejecuta: pip install pyserial")
+    except Exception as e:
+        print("  ERROR: " + str(e))
+
+    print("")
+    if puertos_abiertos:
+        print("Conectado(s):")
+        for p in puertos_abiertos:
+            try:
+                print("  - " + p.port)
+            except:
+                pass
+    else:
+        print("ATENCION: No se pudo abrir ningun puerto serie")
+        print("Conecta el Arduino por USB o Bluetooth y reinicia el servidor")
     print("")
     print("Endpoints:")
-    print("  GET  /          - Estado del servidor")
+    print("  GET  /          - Estado del servidor y puertos")
     print("  POST /enviar    - Enviar comando al Arduino")
     print("  POST /escanear  - Escanear codigo desde el Arduino")
     print("")
     print("Presiona Ctrl+C para salir")
     print("")
 
-    servidor = HTTPServer(("0.0.0.0", PUERTO), Manejador)
+    servidor = ThreadingHTTPServer(("0.0.0.0", PUERTO_HTTP), Manejador)
 
     try:
         servidor.serve_forever()
     except KeyboardInterrupt:
         print("")
         print("Servidor detenido")
-        if bt and bt.is_open:
-            bt.close()
+        cerrar_todos_los_puertos()
         servidor.server_close()
