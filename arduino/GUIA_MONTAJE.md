@@ -114,25 +114,25 @@ El HC-05 funciona a 3.3V en su pin RX. Hay que hacer un **divisor de tensión** 
 
 ```
                     ARDUINO UNO
-    ┌──────────────────────────────────────┐
-    │                                      │
-    │  (RX) 0    ○ ○   5V ────── HC-05 VCC │
-    │  (TX) 1    ○ ○   GND ─ GND compartido│
-    │        2 ←─── IR Receiver (OUT)      │
-    │        3 ──→ 220Ω ──→ LED IR (ánodo) │
-    │        4 ──→ RF Emisor (DATA)        │
-    │        5 ←─── RF Receptor (DATA)     │
+    ┌───────────────────────────────────────┐
+    │                                       │
+    │  (RX) 0    ○ ○   5V ────── HC-05 VCC  │
+    │  (TX) 1    ○ ○   GND ─ GND compartido │
+    │        2 ←─── IR Receiver (OUT)       │
+    │        3 ──→ 220Ω ──→ LED IR (ánodo)  │
+    │        4 ──→ RF Emisor (DATA)         │
+    │        5 ←─── RF Receptor (DATA)      │
     │        6                              │
     │        7                              │
     │        8                              │
     │        9                              │
-    │       10 ←─── HC-05 TX (directo)     │
-    │       11 ──→ 2kΩ ─┬─→ HC-05 RX       │
+    │       10 ←─── HC-05 TX (directo)      │
+    │       11 ──→ 2kΩ ─┬─→ HC-05 RX        │
     │                   │                   │
     │       12         1kΩ                  │
     │       13          │                   │
     │                  GND                  │
-    └──────────────────────────────────────┘
+    └───────────────────────────────────────┘
 
     IMPORTANTE: GND comun entre TODOS los modulos
 ```
@@ -159,10 +159,10 @@ Luego desde la web: `http://localhost/Smart-Controler/web/`
 
 ## 7. SOLUCION DE PROBLEMAS
 
-| Síntoma | Causa probable |
-|---------|---------------|
-| No aparece `OK:INICIADO` | Velocidad de Monitor Serie incorrecta (debe ser 9600) |
-| No capta IR | Receptor IR en pin incorrecto, polaridad invertida, o GND faltante |
-| No envía IR | LED IR emisor quemado o resistencia muy alta |
-| HC-05 no conecta | Divisor de tensión mal hecho, o RX/TX invertidos |
-| RF no funciona | Antena faltante (un trozo de cable de 17cm ayuda) |
+| Fallo            | Causa probable |
+|------------------|----------------|
+| No aparece       |`OK:INICIADO`   | Velocidad de Monitor Serie incorrecta (debe ser 9600) |
+| No capta IR      |                | Receptor IR en pin incorrecto, polaridad invertida, o GND faltante |
+| No envía IR      |                | LED IR emisor quemado o resistencia muy alta |
+| HC-05 no conecta |                | Divisor de tensión mal hecho, o RX/TX invertidos |
+| RF no funciona   |                | Antena faltante (un trozo de cable de 17cm ayuda) |

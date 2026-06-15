@@ -19,7 +19,7 @@ import time
 
 PUERTO_HTTP = 5000
 PUERTOS_SERIE = [
-    os.environ.get("USB_COM", "COM3"),    # USB - Arduino directo
+    os.environ.get("USB_COM", "COM6"),    # USB - Arduino directo
     os.environ.get("BT_COM", "COM4"),     # Bluetooth HC-05
 ]
 BT_BAUD = 9600
