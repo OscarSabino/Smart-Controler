@@ -24,6 +24,12 @@ PUERTOS_SERIE = [
 ]
 BT_BAUD = 9600
 TIMEOUT_ESCANEO = 30
+ARCHIVO_SCAN = "scan_result.txt"
+ARCHIVO_ENVIAR = "comando_enviado.txt"
+ARCHIVO_RF_SCAN = "rf_scan_result.txt"
+ARCHIVO_RF_ENVIAR = "rf_comando_enviado.txt"
+ARCHIVO_IR_SCAN = "ir_scan_result.txt"
+ARCHIVO_IR_ENVIAR = "ir_comando_enviado.txt"
 
 # Lista de puertos serie abiertos
 puertos_abiertos = []
@@ -76,6 +82,15 @@ def enviar_a_arduino(trama):
             pass
 
 
+def escribir_archivo(ruta, contenido):
+    """Escribe contenido a un archivo (pisa si existe)"""
+    try:
+        with open(ruta, "w") as f:
+            f.write(contenido)
+    except Exception as e:
+        print("Error al escribir " + ruta + ": " + str(e))
+
+
 def limpiar_buffers():
     """Limpia buffers de entrada de todos los puertos"""
     for p in puertos_abiertos:
@@ -85,6 +100,25 @@ def limpiar_buffers():
                     p.readline()
         except:
             pass
+
+
+ARCHIVOS = [
+    ARCHIVO_SCAN,
+    ARCHIVO_ENVIAR,
+    ARCHIVO_RF_SCAN,
+    ARCHIVO_RF_ENVIAR,
+    ARCHIVO_IR_SCAN,
+    ARCHIVO_IR_ENVIAR,
+]
+
+
+def crear_archivos_vacios():
+    """Crea todos los archivos de texto vacios al iniciar"""
+    for ruta in ARCHIVOS:
+        escribir_archivo(ruta, "")
+    print("Archivos de texto creados:")
+    for ruta in ARCHIVOS:
+        print("  - " + ruta)
 
 
 # =============================================
@@ -140,18 +174,40 @@ class Manejador(BaseHTTPRequestHandler):
                 self.enviar_error(400, "Falta el codigo del comando")
                 return
 
-            p = puerto_activo()
-            if not p:
-                self.enviar_error(500, "No hay ningun puerto serie conectado")
-                return
-
-            if protocolo.upper() == "RF":
-                trama = "RF:" + codigo + "\n"
+            # Si el codigo ya incluye el prefijo (ej. "IR:0x..."), no lo duplicamos
+            if codigo.startswith("IR:") or codigo.startswith("RF:"):
+                trama = codigo + "\n"
             else:
-                trama = "IR:" + codigo + "\n"
+                trama = protocolo.upper() + ":" + codigo + "\n"
 
-            enviar_a_arduino(trama)
-            print("Enviando: " + trama.strip())
+            # Escribir el comando al archivo general (pisando si existe)
+            escribir_archivo(ARCHIVO_ENVIAR, trama)
+            print("Comando escrito en " + ARCHIVO_ENVIAR + ": " + trama.strip())
+
+            # Si es RF, escribir tambien al archivo RF especifico
+            if trama.startswith("RF:") or protocolo.upper() == "RF":
+                escribir_archivo(ARCHIVO_RF_ENVIAR, trama)
+                print("Comando RF escrito en " + ARCHIVO_RF_ENVIAR + ": " + trama.strip())
+
+            # Si es IR, escribir tambien al archivo IR especifico
+            if trama.startswith("IR:") or protocolo.upper() == "IR":
+                escribir_archivo(ARCHIVO_IR_ENVIAR, trama)
+                print("Comando IR escrito en " + ARCHIVO_IR_ENVIAR + ": " + trama.strip())
+
+            # Leer el archivo y enviar al Arduino
+            try:
+                with open(ARCHIVO_ENVIAR, "r") as f:
+                    contenido = f.read().strip()
+                if contenido:
+                    enviar_a_arduino(contenido + "\n")
+                    print("Enviado desde archivo: " + contenido)
+                else:
+                    enviar_a_arduino(trama)
+                    print("Archivo vacio, enviando directo: " + trama.strip())
+            except Exception as e:
+                print("Error leyendo archivo, enviando directo: " + str(e))
+                enviar_a_arduino(trama)
+
             self.enviar_json({
                 "mensaje": "Senial enviada correctamente",
                 "protocolo": protocolo,
@@ -166,16 +222,15 @@ class Manejador(BaseHTTPRequestHandler):
     # ESCANEAR UN CODIGO DESDE EL ARDUINO
     # =============================================
     def escanear_codigo(self):
-        try:
-            datos = self.leer_json()
-            protocolo = datos.get("protocolo", "IR")
-        except:
-            protocolo = "IR"
-
         p = puerto_activo()
         if not p:
             self.enviar_error(500, "No hay ningun puerto serie conectado")
             return
+
+        # Sobreescribir todos los archivos vacios al empezar el scan
+        for ruta in ARCHIVOS:
+            escribir_archivo(ruta, "")
+        print("Archivos de texto sobrescritos. Esperando senal RF en pin 11...")
 
         # Limpiamos el buffer de entrada
         time.sleep(0.2)
@@ -185,47 +240,72 @@ class Manejador(BaseHTTPRequestHandler):
         except:
             pass
 
-        # Enviamos SCAN:IR o SCAN:RF al Arduino
-        comando = "SCAN:" + protocolo.upper() + "\n"
+        # Enviamos SCAN al Arduino
         try:
-            p.write(comando.encode())
+            p.write(b"SCAN\n")
         except Exception as e:
-            self.enviar_error(500, "Error al escribir en puerto serie: " + str(e))
+            self.enviar_error(500, "Error: Error al escribir en puerto serie: " + str(e))
             return
-        print("Modo SCAN activado. Esperando senal " + protocolo + "...")
 
+        # Monitoreamos el archivo durante el tiempo de escaneo
         inicio = time.time()
         while time.time() - inicio < TIMEOUT_ESCANEO:
             try:
+                # Leer datos del puerto serie si el Arduino respondio
                 if p.in_waiting > 0:
                     linea = p.readline().decode("utf-8").strip()
-                    print("Arduino dice: " + linea)
-
-                    if linea.startswith(protocolo.upper() + ":"):
-                        codigo_hex = linea[3:]
-                        codigo_completo = protocolo + ":0x" + codigo_hex
-                        self.enviar_json({
-                            "codigo": codigo_completo,
-                            "protocolo": protocolo
-                        })
+                    print("Arduino: " + linea)
+                    if linea.startswith("RF:"):
+                        escribir_archivo(ARCHIVO_SCAN, linea + "\n")
+                        escribir_archivo(ARCHIVO_RF_SCAN, linea + "\n")
+                        contenido = linea[3:]
+                        self.enviar_json({"codigo": contenido, "protocolo": "RF"})
                         return
-                    elif linea.startswith("OK:"):
-                        continue
-                    elif linea.startswith("ERROR"):
-                        if "TIMEOUT" in linea:
-                            self.enviar_error(408, "Señal no recibida en el tiempo de espera")
-                        else:
-                            self.enviar_error(400, "Error del Arduino: " + linea)
+                    elif linea.startswith("IR:"):
+                        escribir_archivo(ARCHIVO_SCAN, linea + "\n")
+                        escribir_archivo(ARCHIVO_IR_SCAN, linea + "\n")
+                        contenido = linea[3:]
+                        self.enviar_json({"codigo": contenido, "protocolo": "IR"})
                         return
             except Exception as e:
-                self.enviar_error(500, "Error leyendo puerto serie: " + str(e))
-                return
+                pass
+
+            # Leer el archivo por si otra instancia escribio algo
+            try:
+                with open(ARCHIVO_SCAN, "r") as f:
+                    contenido = f.read().strip()
+                if contenido:
+                    if contenido.startswith("IR:"):
+                        self.enviar_json({"codigo": contenido[3:], "protocolo": "IR"})
+                        return
+                    elif contenido.startswith("RF:"):
+                        self.enviar_json({"codigo": contenido[3:], "protocolo": "RF"})
+                        return
+            except:
+                pass
+
+            # Leer archivos especificos por si escribio otra instancia
+            try:
+                with open(ARCHIVO_IR_SCAN, "r") as f:
+                    contenido = f.read().strip()
+                if contenido and contenido.startswith("IR:"):
+                    self.enviar_json({"codigo": contenido[3:], "protocolo": "IR"})
+                    return
+            except:
+                pass
+            try:
+                with open(ARCHIVO_RF_SCAN, "r") as f:
+                    contenido = f.read().strip()
+                if contenido and contenido.startswith("RF:"):
+                    self.enviar_json({"codigo": contenido[3:], "protocolo": "RF"})
+                    return
+            except:
+                pass
 
             time.sleep(0.1)
 
-        self.enviar_error(
-            408, "Tiempo de espera agotado. No se recibio ningun codigo"
-        )
+        # Tiempo agotado, archivo vacio
+        self.enviar_json({"codigo": "", "protocolo": ""})
 
     # =============================================
     # FUNCIONES AYUDANTES
@@ -294,6 +374,15 @@ if __name__ == "__main__":
     else:
         print("ATENCION: No se pudo abrir ningun puerto serie")
         print("Conecta el Arduino por USB o Bluetooth y reinicia el servidor")
+
+    print("")
+    crear_archivos_vacios()
+    print("Archivo de resultados: " + ARCHIVO_SCAN)
+    print("Archivo de envio: " + ARCHIVO_ENVIAR)
+    print("Archivo RF scan: " + ARCHIVO_RF_SCAN)
+    print("Archivo RF envio: " + ARCHIVO_RF_ENVIAR)
+    print("Archivo IR scan: " + ARCHIVO_IR_SCAN)
+    print("Archivo IR envio: " + ARCHIVO_IR_ENVIAR)
     print("")
     print("Endpoints:")
     print("  GET  /          - Estado del servidor y puertos")

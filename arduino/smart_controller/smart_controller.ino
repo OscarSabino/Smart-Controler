@@ -1,6 +1,7 @@
 /*
   SMART CONTROLLER - Arduino
   USB (Serial) + Bluetooth (HC-05)
+  IR (receiver + sender) + RF 433MHz (RH_ASK)
 
   COMANDOS:
     IR:CODIGOHEX  -> Enviar codigo IR especifico
@@ -12,18 +13,17 @@
 
   SALIDA (por IR/RF capturado):
     IR:CODIGOHEX
-    RF:CODIGO
+    RF:TEXTO
     OK:... | ERROR:...
 */
 
-#define IR_RECEIVE_PIN  2
-#define IR_SEND_PIN     3
-#define PIN_RF_SEND     4
-#define PIN_RF_RECV     5
-#define BT_RX          10
-#define BT_TX          11
+#define IR_RECEIVE_PIN  8
+#define IR_SEND_PIN     9
+#define PIN_RF_SEND     12
+#define PIN_RF_RECV     11
+#define BT_RX          6
+#define BT_TX          7
 
-// Habilitar los decodificadores de protocolos IR mas comunes
 #define DECODE_NEC
 #define DECODE_SONY
 #define DECODE_RC5
@@ -31,17 +31,17 @@
 #define DECODE_SAMSUNG
 #define DECODE_LG
 #define DECODE_JVC
-// NO habilitar DECODE_HASH para evitar codigos falsos por ruido
 
 #include <IRremote.hpp>
-#include <RCSwitch.h>
+#include <RH_ASK.h>
+#include <SPI.h>
 #include <SoftwareSerial.h>
 
-RCSwitch rfSwitch = RCSwitch();
+RH_ASK rf_driver(2000, PIN_RF_RECV, PIN_RF_SEND);
 SoftwareSerial BT(BT_RX, BT_TX);
 
 unsigned long ultimoIR = 0;
-unsigned long ultimoRF = 0;
+String ultimoRF = "";
 bool modoScan = false;
 unsigned long scanInicio = 0;
 const unsigned long SCAN_TIMEOUT = 10000;
@@ -57,8 +57,7 @@ void setup() {
 
   IrReceiver.begin(IR_RECEIVE_PIN, DISABLE_LED_FEEDBACK);
   IrSender.begin(IR_SEND_PIN);
-  rfSwitch.enableTransmit(PIN_RF_SEND);
-  rfSwitch.enableReceive(PIN_RF_RECV);
+  rf_driver.init();
 
   delay(1000);
   Serial.flush();
@@ -74,8 +73,9 @@ void enviarIR(unsigned long codigo) {
   enviar("OK:IR enviado");
 }
 
-void enviarRF(unsigned long codigo) {
-  rfSwitch.send(codigo, 24);
+void enviarRF(String codigo) {
+  rf_driver.send((uint8_t*)codigo.c_str(), codigo.length());
+  rf_driver.waitPacketSent();
   ultimoRF = codigo;
   enviar("OK:RF enviado");
 }
@@ -95,7 +95,7 @@ void procesar(String cmd) {
     }
   }
   else if (cmd == "SEND_RF") {
-    if (ultimoRF == 0) {
+    if (ultimoRF == "") {
       enviar("ERROR:No hay codigo RF capturado");
     } else {
       enviarRF(ultimoRF);
@@ -103,7 +103,7 @@ void procesar(String cmd) {
   }
   else if (cmd.startsWith("SCAN")) {
     ultimoIR = 0;
-    ultimoRF = 0;
+    ultimoRF = "";
     modoScan = true;
     scanInicio = millis();
     enviar("OK:SCAN_LISTENING");
@@ -119,16 +119,10 @@ void procesar(String cmd) {
   else if (cmd.startsWith("RF:")) {
     String val = cmd.substring(3);
     val.trim();
-    unsigned long codigo;
-    if (val.startsWith("0x") || val.startsWith("0X")) {
-      codigo = strtoul(val.c_str(), NULL, 16);
-    } else {
-      codigo = strtoul(val.c_str(), NULL, 10);
-    }
-    if (codigo == 0) {
+    if (val == "") {
       enviar("ERROR:Codigo RF invalido");
     } else {
-      enviarRF(codigo);
+      enviarRF(val);
     }
   }
 }
@@ -159,7 +153,6 @@ void leerComandos() {
 void loop() {
   if (IrReceiver.decode()) {
     if (!(IrReceiver.decodedIRData.flags & IRDATA_FLAGS_IS_REPEAT) && modoScan) {
-      // Solo aceptar si un decodificador reconocio el protocolo (NEC, Sony, etc.)
       if (IrReceiver.decodedIRData.protocol != UNKNOWN) {
         unsigned long valor = IrReceiver.decodedIRData.decodedRawData;
         if (valor != 0 && valor != 0xFFFFFFFF) {
@@ -172,18 +165,23 @@ void loop() {
     IrReceiver.resume();
   }
 
-  if (rfSwitch.available()) {
-    if (rfSwitch.getReceivedValue() != 0 && modoScan) {
-      ultimoRF = rfSwitch.getReceivedValue();
-      enviar("RF:" + String(ultimoRF));
-      modoScan = false;
+  uint8_t buf[RH_ASK_MAX_MESSAGE_LEN];
+  uint8_t buflen = sizeof(buf);
+  if (modoScan && rf_driver.recv(buf, &buflen)) {
+    if (buflen > 0) {
+      buf[buflen] = '\0';
+      String msg = String((char*)buf);
+      msg.trim();
+      if (msg != "") {
+        ultimoRF = msg;
+        enviar("RF:" + msg);
+        modoScan = false;
+      }
     }
-    rfSwitch.resetAvailable();
   }
 
   if (modoScan && millis() - scanInicio > SCAN_TIMEOUT) {
     modoScan = false;
-    enviar("ERROR:SCAN_TIMEOUT");
   }
 
   leerComandos();

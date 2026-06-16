@@ -35,13 +35,23 @@ if (!$comando) {
 }
 
 // Validamos protocolo y codigo antes de pasarlos a PowerShell
-$protocolo = strtoupper($comando['protocolo']);
-$codigo = $comando['codigo'];
-if (!in_array($protocolo, ['IR', 'RF']) || !preg_match('/^[A-Fa-f0-9]+$/', $codigo)) {
-    http_response_code(400);
-    echo json_encode(["error" => "Protocolo o codigo invalido"]);
-    exit();
-}
+    $protocolo = strtoupper($comando['protocolo']);
+    $codigo = $comando['codigo'];
+    if (!in_array($protocolo, ['IR', 'RF'])) {
+        http_response_code(400);
+        echo json_encode(["error" => "Protocolo invalido"]);
+        exit();
+    }
+    // IR: solo hexadecimal, RF: cualquier texto
+    if ($protocolo == "IR" && !preg_match('/^[A-Fa-f0-9]+$/', $codigo)) {
+        http_response_code(400);
+        echo json_encode(["error" => "Codigo IR invalido (no hexadecimal)"]);
+        exit();
+    } else if ($protocolo == "RF" && empty($codigo)) {
+        http_response_code(400);
+        echo json_encode(["error" => "Codigo RF vacio"]);
+        exit();
+    }
 
 // Puerto COM donde esta conectado el HC-05 (cambiar segun tu PC)
 $puerto = getenv("BT_COM") ?: "COM4";

@@ -265,17 +265,23 @@ function escanearCodigo() {
     })
         .then(function(r) {
             if (!escaneando) return;
-            if (r.status == 408) {
-                return r.json().then(function(d) { throw new Error(d.error); });
-            }
             if (!r.ok) {
-                return r.json().then(function(d) { throw new Error(d.error); });
+                return r.json().then(function(d) { throw new Error(d.error || "Error del servidor"); });
             }
             return r.json();
         })
         .then(function(respuesta) {
             if (!escaneando) return;
+            if (respuesta.codigo == "") {
+                msg.textContent = "Tiempo de espera agotado. No se recibio ninguna senal.";
+                msg.className = "msg-scan msg-error";
+                return;
+            }
             input.value = respuesta.codigo;
+            var prot = document.getElementById("inp-cmd-protocolo");
+            if (prot && respuesta.protocolo) {
+                prot.value = respuesta.protocolo;
+            }
             msg.textContent = "Codigo capturado!";
             msg.className = "msg-scan msg-ok";
         })

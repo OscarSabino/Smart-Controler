@@ -21,17 +21,17 @@
 ## ASIGNACION DE PINES (Arduino)
 
 ```
-Pin 2  → Receptor IR (señal)
-Pin 3  → LED IR emisor (ánodo)
-Pin 4  → RF Emisor (DATA)
-Pin 5  → RF Receptor (DATA)
-Pin 10 → HC-05 TX (entrada serial)
-Pin 11 → HC-05 RX (salida serial, con divisor de tensión)
+Pin 6  → HC-05 TX (entrada serial)
+Pin 7  → HC-05 RX (salida serial, con divisor de tensión)
+Pin 8  → Receptor IR (señal)
+Pin 9  → LED IR emisor (ánodo)
+Pin 11 → RF Receptor (DATA)
+Pin 12 → RF Emisor (DATA)
 ```
 
 ---
 
-## 1. RECEPTOR IR (Pin 2)
+## 1. RECEPTOR IR (Pin 8)
 
 El receptor IR tiene 3 patitas. Mirando la cara plana (con la marca hacia ti):
 
@@ -40,7 +40,7 @@ El receptor IR tiene 3 patitas. Mirando la cara plana (con la marca hacia ti):
  |  ○ ○  |   Cara plana hacia ti
  |_ ○ ___|
    │ │ │
-   │ │ └─── Pin 3: Señal (OUT) → Pin 2 Arduino
+   │ │ └─── Pin 3: Señal (OUT) → Pin 8 Arduino
    │ └───── Pin 2: GND → GND Arduino
    └─────── Pin 1: VCC → 5V Arduino
 ```
@@ -48,19 +48,19 @@ El receptor IR tiene 3 patitas. Mirando la cara plana (con la marca hacia ti):
 **Conexiones:**
 - Patita izquierda (VCC) → 5V Arduino
 - Patita centro (GND) → GND Arduino
-- Patita derecha (OUT) → Pin 2 Arduino
+- Patita derecha (OUT) → Pin 8 Arduino
 
 ---
 
-## 2. LED IR EMISOR (Pin 3)
+## 2. LED IR EMISOR (Pin 9)
 
 El LED IR se parece a un LED normal pero es transparente/azulado.
 
 **Conexiones:**
-- Ánodo (pata larga) → Pin 3 Arduino (con resistencia 220Ω en serie)
+- Ánodo (pata larga) → Pin 9 Arduino (con resistencia 220Ω en serie)
 - Cátodo (pata corta) → GND Arduino
 
-Opcional: también puedes conectarlo directo a Pin 3 (el pin PWM ya limita corriente), pero es mejor con resistencia.
+Opcional: también puedes conectarlo directo a Pin 9 (el pin PWM ya limita corriente), pero es mejor con resistencia.
 
 ---
 
@@ -68,14 +68,14 @@ Opcional: también puedes conectarlo directo a Pin 3 (el pin PWM ya limita corri
 
 ### Emisor (TX)
 ```
-Pin 4 Arduino → DATA del emisor
-5V Arduino   → VCC del emisor
-GND Arduino  → GND del emisor
+Pin 12 Arduino → DATA del emisor
+5V Arduino    → VCC del emisor
+GND Arduino   → GND del emisor
 ```
 
 ### Receptor (RX)
 ```
-Pin 5 Arduino → DATA del receptor
+Pin 11 Arduino → DATA del receptor
 5V Arduino    → VCC del receptor
 GND Arduino   → GND del receptor
 ```
@@ -84,12 +84,12 @@ GND Arduino   → GND del receptor
 
 ## 4. MODULO BLUETOOTH HC-05
 
-El HC-05 funciona a 3.3V en su pin RX. Hay que hacer un **divisor de tensión** para bajar los 5V del pin 11 del Arduino a ~3.3V.
+El HC-05 funciona a 3.3V en su pin RX. Hay que hacer un **divisor de tensión** para bajar los 5V del pin 7 del Arduino a ~3.3V.
 
 ### Divisor de tensión para RX del HC-05:
 
 ```
-     Arduino Pin 11 ──── 2kΩ ────┬──── RX del HC-05
+     Arduino Pin 7 ──── 2kΩ ────┬──── RX del HC-05
                                  │
                                 1kΩ
                                  │
@@ -102,8 +102,8 @@ El HC-05 funciona a 3.3V en su pin RX. Hay que hacer un **divisor de tensión** 
 |-------|----------|
 | VCC   | 5V Arduino |
 | GND   | GND Arduino |
-| TX    | Directo a Pin 10 Arduino |
-| RX    | A través del divisor (ver arriba) desde Pin 11 Arduino |
+| TX    | Directo a Pin 6 Arduino |
+| RX    | A través del divisor (ver arriba) desde Pin 7 Arduino |
 | KEY   | Dejarlo desconectado (solo se usa para modo AT) |
 
 > **El HC-05 necesita 5V en VCC, NO 3.3V.** El divisor solo va en el pin RX.
@@ -118,20 +118,20 @@ El HC-05 funciona a 3.3V en su pin RX. Hay que hacer un **divisor de tensión** 
     │                                       │
     │  (RX) 0    ○ ○   5V ────── HC-05 VCC  │
     │  (TX) 1    ○ ○   GND ─ GND compartido │
-    │        2 ←─── IR Receiver (OUT)       │
-    │        3 ──→ 220Ω ──→ LED IR (ánodo)  │
-    │        4 ──→ RF Emisor (DATA)         │
-    │        5 ←─── RF Receptor (DATA)      │
-    │        6                              │
-    │        7                              │
-    │        8                              │
-    │        9                              │
-    │       10 ←─── HC-05 TX (directo)      │
-    │       11 ──→ 2kΩ ─┬─→ HC-05 RX        │
+    │        2    ○ ○                       │
+    │        3    ○ ○                       │
+    │        4    ○ ○                       │
+    │        5    ○ ○                       │
+    │        6 ←─── HC-05 TX (directo)      │
+    │        7 ──→ 2kΩ ─┬─→ HC-05 RX        │
     │                   │                   │
-    │       12         1kΩ                  │
-    │       13          │                   │
-    │                  GND                  │
+    │        8 ←─── IR Receiver (OUT)       │
+    │        9 ──→ 220Ω ──→ LED IR (ánodo)  │
+    │       10    ○ ○  1kΩ                  │
+    │                   │                   │
+    │       11 ←─── RF Receptor (DATA)      │
+    │       12 ──→ RF Emisor (DATA)         │
+    │       13    ○ ○  GND                  │
     └───────────────────────────────────────┘
 
     IMPORTANTE: GND comun entre TODOS los modulos
@@ -161,8 +161,8 @@ Luego desde la web: `http://localhost/Smart-Controler/web/`
 
 | Fallo            | Causa probable |
 |------------------|----------------|
-| No aparece       |`OK:INICIADO`   | Velocidad de Monitor Serie incorrecta (debe ser 9600) |
-| No capta IR      |                | Receptor IR en pin incorrecto, polaridad invertida, o GND faltante |
-| No envía IR      |                | LED IR emisor quemado o resistencia muy alta |
-| HC-05 no conecta |                | Divisor de tensión mal hecho, o RX/TX invertidos |
-| RF no funciona   |                | Antena faltante (un trozo de cable de 17cm ayuda) |
+| No aparece `OK:INICIADO` | Velocidad de Monitor Serie incorrecta (debe ser 9600) |
+| No capta IR      | Receptor IR en pin 8 incorrecto, polaridad invertida, o GND faltante |
+| No envía IR      | LED IR emisor en pin 9 quemado o resistencia muy alta |
+| HC-05 no conecta | Divisor de tensión mal hecho, o RX/TX invertidos |
+| RF no funciona   | Antena faltante (un trozo de cable de 17cm ayuda) |
