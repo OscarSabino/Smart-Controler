@@ -169,6 +169,8 @@ class Manejador(BaseHTTPRequestHandler):
             datos = self.leer_json()
             protocolo = datos.get("protocolo", "IR")
             codigo = datos.get("codigo", "")
+            proto_num = datos.get("proto_num")
+            bits = datos.get("bits")
 
             if not codigo:
                 self.enviar_error(400, "Falta el codigo del comando")
@@ -177,6 +179,24 @@ class Manejador(BaseHTTPRequestHandler):
             # Si el codigo ya incluye el prefijo (ej. "IR:0x..."), no lo duplicamos
             if codigo.startswith("IR:") or codigo.startswith("RF:"):
                 trama = codigo + "\n"
+            elif protocolo.upper() == "IR":
+                # Si tenemos proto_num y bits del frontend, usarlos
+                if proto_num is not None and bits is not None:
+                    trama = "IR:" + codigo + "," + str(proto_num) + "," + str(bits) + "\n"
+                else:
+                    # Buscar en el ultimo scan IR por si tiene proto/bits
+                    trama = "IR:" + codigo + "\n"
+                    try:
+                        with open(ARCHIVO_IR_SCAN, "r") as f_scan:
+                            scan_line = f_scan.read().strip()
+                        if scan_line:
+                            # scan_line es "IR:CODIGO,PROTO,BITS"
+                            scan_parts = scan_line[3:].split(",")
+                            if len(scan_parts) >= 3 and scan_parts[0] == codigo:
+                                trama = scan_line + "\n"
+                                print("Usando proto/bits del scan: " + trama.strip())
+                    except:
+                        pass
             else:
                 trama = protocolo.upper() + ":" + codigo + "\n"
 
@@ -266,7 +286,8 @@ class Manejador(BaseHTTPRequestHandler):
                 with open(ARCHIVO_RF_SCAN, "r") as f:
                     contenido = f.read().strip()
                 if contenido:
-                    self.enviar_json({"codigo": contenido[3:], "protocolo": "RF"})
+                    partes = contenido[3:].split(",")
+                    self.enviar_json({"codigo": partes[0], "protocolo": "RF"})
                     return
             except:
                 pass
@@ -276,7 +297,12 @@ class Manejador(BaseHTTPRequestHandler):
                 with open(ARCHIVO_IR_SCAN, "r") as f:
                     contenido = f.read().strip()
                 if contenido:
-                    self.enviar_json({"codigo": contenido[3:], "protocolo": "IR"})
+                    partes = contenido[3:].split(",")
+                    respuesta = {"codigo": partes[0], "protocolo": "IR"}
+                    if len(partes) >= 3:
+                        respuesta["proto_num"] = int(partes[1])
+                        respuesta["bits"] = int(partes[2])
+                    self.enviar_json(respuesta)
                     return
             except:
                 pass

@@ -27,6 +27,11 @@ RCSwitch rf;
 SoftwareSerial BT(BT_RX, BT_TX);
 
 unsigned long ultimoIR = 0;
+int ultimoIRProto = NEC;
+unsigned int ultimoIRBits = 32;
+uint8_t irRawTicks[200];
+uint8_t irRawLen = 0;
+uint8_t irRawKhz = 38;
 unsigned long ultimoRF = 0;
 unsigned int ultimoRFBits = 0;
 unsigned int ultimoRFProto = 0;
@@ -57,9 +62,43 @@ void setup() {
   enviar("OK:INICIADO");
 }
 
-void enviarIR(unsigned long codigo) {
-  IrSender.sendNEC(codigo, 32);
+void enviarIR(unsigned long codigo, int proto = NEC, unsigned int bits = 32) {
+  if (irRawLen > 0 && ultimoIR == codigo && ultimoIRProto == proto && ultimoIRBits == bits) {
+    IrSender.sendRaw(irRawTicks, irRawLen, irRawKhz);
+    delay(100);
+    IrSender.sendRaw(irRawTicks, irRawLen, irRawKhz);
+  } else {
+    switch (proto) {
+      case NEC:
+        IrSender.sendNECRaw(codigo, 3);
+        break;
+      case SONY:
+        IrSender.sendSonyMSB(codigo, bits ? bits : 12);
+        break;
+      case RC5:
+        IrSender.sendRC5(codigo, bits ? bits : 12);
+        break;
+      case RC6:
+        IrSender.sendRC6((uint32_t)codigo, bits ? bits : 20);
+        break;
+      case SAMSUNG:
+        IrSender.sendSamsungMSB(codigo, bits ? bits : 32);
+        break;
+      case LG:
+        IrSender.sendLG(codigo, bits ? bits : 28);
+        break;
+      case JVC:
+        IrSender.sendJVCMSB(codigo, bits ? bits : 16, false);
+        break;
+      default:
+        IrSender.sendNECRaw(codigo, 3);
+        break;
+    }
+    irRawLen = 0;
+  }
   ultimoIR = codigo;
+  ultimoIRProto = proto;
+  ultimoIRBits = bits;
   enviar("OK:IR enviado");
 }
 
@@ -81,11 +120,19 @@ void procesar(String cmd) {
   if (cmd == "TEST") {
     enviar("OK:TEST");
   }
+  else if (cmd == "TEST_IR") {
+    IrSender.sendNECRaw(0x00FFA25D, 3);
+    enviar("OK:TEST_IR enviado (0xFFA25D x4)");
+  }
+  else if (cmd == "TEST_IR_MSB") {
+    IrSender.sendNECMSB(0x00FFA25D, 32, false);
+    enviar("OK:TEST_IR_MSB enviado");
+  }
   else if (cmd == "SEND_IR") {
     if (ultimoIR == 0) {
       enviar("ERROR:No hay codigo IR capturado");
     } else {
-      enviarIR(ultimoIR);
+      enviarIR(ultimoIR, ultimoIRProto, ultimoIRBits);
     }
   }
   else if (cmd == "SEND_RF") {
@@ -98,6 +145,7 @@ void procesar(String cmd) {
   else if (cmd.startsWith("SCAN")) {
     ultimoIR = 0;
     ultimoRF = 0;
+    irRawLen = 0;
 
     Serial.println("OK:SCAN_LISTENING");
     Serial.println("DEBUG:SCAN_INICIADO");
@@ -135,8 +183,30 @@ void procesar(String cmd) {
             unsigned long valor = IrReceiver.decodedIRData.decodedRawData;
             if (valor != 0 && valor != 0xFFFFFFFF) {
               ultimoIR = valor;
+              ultimoIRProto = IrReceiver.decodedIRData.protocol;
+              ultimoIRBits = IrReceiver.decodedIRData.numberOfBits;
+
+              irRawLen = IrReceiver.decodedIRData.rawlen - 1;
+              for (uint8_t i = 0; i < irRawLen && i < 200; i++) {
+                irRawTicks[i] = IrReceiver.irparams.rawbuf[i + 1];
+              }
+              switch (ultimoIRProto) {
+                case NEC: case SAMSUNG: case LG: case JVC:
+                  irRawKhz = 38; break;
+                case SONY:
+                  irRawKhz = 40; break;
+                case RC5: case RC6:
+                  irRawKhz = 36; break;
+                default:
+                  irRawKhz = 38; break;
+              }
+
               Serial.print("IR:");
-              Serial.println(ultimoIR, HEX);
+              Serial.print(ultimoIR, HEX);
+              Serial.print(",");
+              Serial.print(ultimoIRProto);
+              Serial.print(",");
+              Serial.println(ultimoIRBits);
             }
           }
         }
@@ -155,11 +225,27 @@ void procesar(String cmd) {
     }
   }
   else if (cmd.startsWith("IR:")) {
-    unsigned long codigo = strtoul(cmd.substring(3).c_str(), NULL, 16);
+    String resto = cmd.substring(3);
+    unsigned long codigo;
+    int proto = ultimoIRProto;
+    unsigned int bits = ultimoIRBits;
+
+    int c1 = resto.indexOf(',');
+    if (c1 > 0) {
+      codigo = strtoul(resto.substring(0, c1).c_str(), NULL, 16);
+      int c2 = resto.indexOf(',', c1 + 1);
+      if (c2 > 0) {
+        proto = resto.substring(c1 + 1, c2).toInt();
+        bits = (unsigned int)resto.substring(c2 + 1).toInt();
+      }
+    } else {
+      codigo = strtoul(resto.c_str(), NULL, 16);
+    }
+
     if (codigo == 0 || codigo == 0xFFFFFFFF) {
       enviar("ERROR:Codigo IR invalido");
     } else {
-      enviarIR(codigo);
+      enviarIR(codigo, proto, bits);
     }
   }
   else if (cmd.startsWith("RF:")) {
@@ -201,7 +287,25 @@ void loop() {
         unsigned long valor = IrReceiver.decodedIRData.decodedRawData;
         if (valor != 0 && valor != 0xFFFFFFFF) {
           ultimoIR = valor;
-          enviar("IR:" + String(ultimoIR, HEX));
+          ultimoIRProto = IrReceiver.decodedIRData.protocol;
+          ultimoIRBits = IrReceiver.decodedIRData.numberOfBits;
+
+          irRawLen = IrReceiver.decodedIRData.rawlen - 1;
+          for (uint8_t i = 0; i < irRawLen && i < 200; i++) {
+            irRawTicks[i] = IrReceiver.irparams.rawbuf[i + 1];
+          }
+          switch (ultimoIRProto) {
+            case NEC: case SAMSUNG: case LG: case JVC:
+              irRawKhz = 38; break;
+            case SONY:
+              irRawKhz = 40; break;
+            case RC5: case RC6:
+              irRawKhz = 36; break;
+            default:
+              irRawKhz = 38; break;
+          }
+
+          enviar("IR:" + String(ultimoIR, HEX) + "," + ultimoIRProto + "," + ultimoIRBits);
         }
       }
     }
