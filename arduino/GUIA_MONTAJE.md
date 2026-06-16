@@ -21,12 +21,13 @@
 ## ASIGNACION DE PINES (Arduino)
 
 ```
+Pin 2  → RF Receptor (DATA) - RCSwitch
+Pin 4  → RF Emisor (DATA) - RCSwitch
 Pin 6  → HC-05 TX (entrada serial)
 Pin 7  → HC-05 RX (salida serial, con divisor de tensión)
 Pin 8  → Receptor IR (señal)
 Pin 9  → LED IR emisor (ánodo)
-Pin 11 → RF Receptor (DATA)
-Pin 12 → RF Emisor (DATA)
+Pin 12 → RF Emisor alternativo (DATA) - RH_ASK
 ```
 
 ---
@@ -64,20 +65,22 @@ Opcional: también puedes conectarlo directo a Pin 9 (el pin PWM ya limita corri
 
 ---
 
-## 3. MODULO RF 433MHz
+## 3. MODULO RF 433MHz (RCSwitch)
+
+Usa la librería **RCSwitch** para recibir y enviar códigos de mandos RF comerciales (protocolos 1-6).
 
 ### Emisor (TX)
 ```
-Pin 12 Arduino → DATA del emisor
-5V Arduino    → VCC del emisor
-GND Arduino   → GND del emisor
+Pin 4 Arduino → DATA del emisor
+5V Arduino   → VCC del emisor
+GND Arduino  → GND del emisor
 ```
 
 ### Receptor (RX)
 ```
-Pin 11 Arduino → DATA del receptor
-5V Arduino    → VCC del receptor
-GND Arduino   → GND del receptor
+Pin 2 Arduino → DATA del receptor
+5V Arduino   → VCC del receptor
+GND Arduino  → GND del receptor
 ```
 
 ---
@@ -118,9 +121,9 @@ El HC-05 funciona a 3.3V en su pin RX. Hay que hacer un **divisor de tensión** 
     │                                       │
     │  (RX) 0    ○ ○   5V ────── HC-05 VCC  │
     │  (TX) 1    ○ ○   GND ─ GND compartido │
-    │        2    ○ ○                       │
+    │        2 ←─── RF Receptor (DATA)      │
     │        3    ○ ○                       │
-    │        4    ○ ○                       │
+    │        4 ──→ RF Emisor (DATA)         │
     │        5    ○ ○                       │
     │        6 ←─── HC-05 TX (directo)      │
     │        7 ──→ 2kΩ ─┬─→ HC-05 RX        │
@@ -129,9 +132,9 @@ El HC-05 funciona a 3.3V en su pin RX. Hay que hacer un **divisor de tensión** 
     │        9 ──→ 220Ω ──→ LED IR (ánodo)  │
     │       10    ○ ○  1kΩ                  │
     │                   │                   │
-    │       11 ←─── RF Receptor (DATA)      │
-    │       12 ──→ RF Emisor (DATA)         │
-    │       13    ○ ○  GND                  │
+    │       11    ○ ○  GND                  │
+    │       12 ──→ RF Emisor alt. (RH_ASK)  │
+    │       13    ○ ○                       │
     └───────────────────────────────────────┘
 
     IMPORTANTE: GND comun entre TODOS los modulos

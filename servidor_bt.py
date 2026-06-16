@@ -219,7 +219,7 @@ class Manejador(BaseHTTPRequestHandler):
             self.enviar_error(500, "Error interno: " + str(e))
 
     # =============================================
-    # ESCANEAR UN CODIGO DESDE EL ARDUINO
+    # ESCANEAR CODIGOS IR / RF
     # =============================================
     def escanear_codigo(self):
         p = puerto_activo()
@@ -227,12 +227,12 @@ class Manejador(BaseHTTPRequestHandler):
             self.enviar_error(500, "No hay ningun puerto serie conectado")
             return
 
-        # Sobreescribir todos los archivos vacios al empezar el scan
-        for ruta in ARCHIVOS:
-            escribir_archivo(ruta, "")
-        print("Archivos de texto sobrescritos. Esperando senal RF en pin 11...")
+        # Pisa los archivos especificos (crea si no existen, pisa si existen)
+        escribir_archivo(ARCHIVO_RF_SCAN, "")
+        escribir_archivo(ARCHIVO_IR_SCAN, "")
+        print("Archivos RF/IR creados/pisados. Esperando senales...")
 
-        # Limpiamos el buffer de entrada
+        # Limpia buffer Serial
         time.sleep(0.2)
         try:
             while p.in_waiting > 0:
@@ -240,71 +240,50 @@ class Manejador(BaseHTTPRequestHandler):
         except:
             pass
 
-        # Enviamos SCAN al Arduino
+        # Envia SCAN al Arduino
         try:
             p.write(b"SCAN\n")
         except Exception as e:
-            self.enviar_error(500, "Error: Error al escribir en puerto serie: " + str(e))
+            self.enviar_error(500, "Error al escribir en puerto serie: " + str(e))
             return
 
-        # Monitoreamos el archivo durante el tiempo de escaneo
         inicio = time.time()
         while time.time() - inicio < TIMEOUT_ESCANEO:
+            # Lee lineas del Arduino
             try:
-                # Leer datos del puerto serie si el Arduino respondio
-                if p.in_waiting > 0:
+                while p.in_waiting > 0:
                     linea = p.readline().decode("utf-8").strip()
                     print("Arduino: " + linea)
                     if linea.startswith("RF:"):
-                        escribir_archivo(ARCHIVO_SCAN, linea + "\n")
                         escribir_archivo(ARCHIVO_RF_SCAN, linea + "\n")
-                        contenido = linea[3:]
-                        self.enviar_json({"codigo": contenido, "protocolo": "RF"})
-                        return
                     elif linea.startswith("IR:"):
-                        escribir_archivo(ARCHIVO_SCAN, linea + "\n")
                         escribir_archivo(ARCHIVO_IR_SCAN, linea + "\n")
-                        contenido = linea[3:]
-                        self.enviar_json({"codigo": contenido, "protocolo": "IR"})
-                        return
-            except Exception as e:
-                pass
-
-            # Leer el archivo por si otra instancia escribio algo
-            try:
-                with open(ARCHIVO_SCAN, "r") as f:
-                    contenido = f.read().strip()
-                if contenido:
-                    if contenido.startswith("IR:"):
-                        self.enviar_json({"codigo": contenido[3:], "protocolo": "IR"})
-                        return
-                    elif contenido.startswith("RF:"):
-                        self.enviar_json({"codigo": contenido[3:], "protocolo": "RF"})
-                        return
             except:
                 pass
 
-            # Leer archivos especificos por si escribio otra instancia
-            try:
-                with open(ARCHIVO_IR_SCAN, "r") as f:
-                    contenido = f.read().strip()
-                if contenido and contenido.startswith("IR:"):
-                    self.enviar_json({"codigo": contenido[3:], "protocolo": "IR"})
-                    return
-            except:
-                pass
+            # Comprueba si el archivo RF tiene contenido
             try:
                 with open(ARCHIVO_RF_SCAN, "r") as f:
                     contenido = f.read().strip()
-                if contenido and contenido.startswith("RF:"):
+                if contenido:
                     self.enviar_json({"codigo": contenido[3:], "protocolo": "RF"})
                     return
             except:
                 pass
 
-            time.sleep(0.1)
+            # Comprueba si el archivo IR tiene contenido
+            try:
+                with open(ARCHIVO_IR_SCAN, "r") as f:
+                    contenido = f.read().strip()
+                if contenido:
+                    self.enviar_json({"codigo": contenido[3:], "protocolo": "IR"})
+                    return
+            except:
+                pass
 
-        # Tiempo agotado, archivo vacio
+            time.sleep(0.05)
+
+        # Tiempo agotado
         self.enviar_json({"codigo": "", "protocolo": ""})
 
     # =============================================

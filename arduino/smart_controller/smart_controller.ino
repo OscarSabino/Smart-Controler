@@ -1,26 +1,13 @@
 /*
   SMART CONTROLLER - Arduino
   USB (Serial) + Bluetooth (HC-05)
-  IR (receiver + sender) + RF 433MHz (RH_ASK)
-
-  COMANDOS:
-    IR:CODIGOHEX  -> Enviar codigo IR especifico
-    RF:CODIGO     -> Enviar codigo RF especifico
-    SEND_IR       -> Re-enviar ultimo IR capturado
-    SEND_RF       -> Re-enviar ultimo RF capturado
-    TEST          -> Responder OK:TEST
-    SCAN          -> Limpiar buffer y entrar en modo scan
-
-  SALIDA (por IR/RF capturado):
-    IR:CODIGOHEX
-    RF:TEXTO
-    OK:... | ERROR:...
+  IR (receiver + sender) + RF 433MHz (RCSwitch)
 */
 
 #define IR_RECEIVE_PIN  8
 #define IR_SEND_PIN     9
-#define PIN_RF_SEND     12
-#define PIN_RF_RECV     11
+#define PIN_RCSWITCH_RX 2
+#define PIN_RCSWITCH_TX 4
 #define BT_RX          6
 #define BT_TX          7
 
@@ -33,17 +20,17 @@
 #define DECODE_JVC
 
 #include <IRremote.hpp>
-#include <RH_ASK.h>
-#include <SPI.h>
+#include <RCSwitch.h>
 #include <SoftwareSerial.h>
 
-RH_ASK rf_driver(2000, PIN_RF_RECV, PIN_RF_SEND);
+RCSwitch rf;
 SoftwareSerial BT(BT_RX, BT_TX);
 
 unsigned long ultimoIR = 0;
-String ultimoRF = "";
-bool modoScan = false;
-unsigned long scanInicio = 0;
+unsigned long ultimoRF = 0;
+unsigned int ultimoRFBits = 0;
+unsigned int ultimoRFProto = 0;
+unsigned int ultimoRFDelay = 0;
 const unsigned long SCAN_TIMEOUT = 10000;
 
 void enviar(String msg) {
@@ -57,7 +44,10 @@ void setup() {
 
   IrReceiver.begin(IR_RECEIVE_PIN, DISABLE_LED_FEEDBACK);
   IrSender.begin(IR_SEND_PIN);
-  rf_driver.init();
+
+  rf.enableReceive(0);
+  rf.enableTransmit(PIN_RCSWITCH_TX);
+  rf.setReceiveTolerance(90);
 
   delay(1000);
   Serial.flush();
@@ -73,10 +63,14 @@ void enviarIR(unsigned long codigo) {
   enviar("OK:IR enviado");
 }
 
-void enviarRF(String codigo) {
-  rf_driver.send((uint8_t*)codigo.c_str(), codigo.length());
-  rf_driver.waitPacketSent();
+void enviarRF(unsigned long codigo, unsigned int bits, unsigned int proto, unsigned int pulso) {
+  if (proto) rf.setProtocol(proto);
+  if (pulso) rf.setPulseLength(pulso);
+  rf.send(codigo, bits ? bits : 24);
   ultimoRF = codigo;
+  ultimoRFBits = bits;
+  ultimoRFProto = proto;
+  ultimoRFDelay = pulso;
   enviar("OK:RF enviado");
 }
 
@@ -95,18 +89,70 @@ void procesar(String cmd) {
     }
   }
   else if (cmd == "SEND_RF") {
-    if (ultimoRF == "") {
+    if (ultimoRF == 0) {
       enviar("ERROR:No hay codigo RF capturado");
     } else {
-      enviarRF(ultimoRF);
+      enviarRF(ultimoRF, ultimoRFBits, ultimoRFProto, ultimoRFDelay);
     }
   }
   else if (cmd.startsWith("SCAN")) {
     ultimoIR = 0;
-    ultimoRF = "";
-    modoScan = true;
-    scanInicio = millis();
-    enviar("OK:SCAN_LISTENING");
+    ultimoRF = 0;
+
+    Serial.println("OK:SCAN_LISTENING");
+    Serial.println("DEBUG:SCAN_INICIADO");
+
+    unsigned long inicio = millis();
+    unsigned long lastDebug = 0;
+
+    while (true) {
+      if (rf.available()) {
+        unsigned long valor = rf.getReceivedValue();
+        unsigned int bits = rf.getReceivedBitlength();
+        unsigned int proto = rf.getReceivedProtocol();
+        unsigned int d = rf.getReceivedDelay();
+        rf.resetAvailable();
+
+        if (valor != 0 && bits > 0) {
+          ultimoRF = valor;
+          ultimoRFBits = bits;
+          ultimoRFProto = proto;
+          ultimoRFDelay = d;
+          Serial.print("RF:");
+          Serial.print(ultimoRF);
+          Serial.print(",");
+          Serial.print(ultimoRFBits);
+          Serial.print(",");
+          Serial.print(ultimoRFProto);
+          Serial.print(",");
+          Serial.println(ultimoRFDelay);
+        }
+      }
+
+      if (IrReceiver.decode()) {
+        if (!(IrReceiver.decodedIRData.flags & IRDATA_FLAGS_IS_REPEAT)) {
+          if (IrReceiver.decodedIRData.protocol != UNKNOWN) {
+            unsigned long valor = IrReceiver.decodedIRData.decodedRawData;
+            if (valor != 0 && valor != 0xFFFFFFFF) {
+              ultimoIR = valor;
+              Serial.print("IR:");
+              Serial.println(ultimoIR, HEX);
+            }
+          }
+        }
+        IrReceiver.resume();
+      }
+
+      if (millis() - inicio > SCAN_TIMEOUT) {
+        Serial.println("DEBUG:SCAN_TIMEOUT");
+        break;
+      }
+
+      if (millis() - lastDebug > 3000) {
+        lastDebug = millis();
+        Serial.println("DEBUG:ESPERANDO_RF...");
+      }
+    }
   }
   else if (cmd.startsWith("IR:")) {
     unsigned long codigo = strtoul(cmd.substring(3).c_str(), NULL, 16);
@@ -117,12 +163,11 @@ void procesar(String cmd) {
     }
   }
   else if (cmd.startsWith("RF:")) {
-    String val = cmd.substring(3);
-    val.trim();
-    if (val == "") {
+    unsigned long codigo = strtoul(cmd.substring(3).c_str(), NULL, 10);
+    if (codigo == 0) {
       enviar("ERROR:Codigo RF invalido");
     } else {
-      enviarRF(val);
+      enviarRF(codigo, ultimoRFBits, ultimoRFProto, ultimoRFDelay);
     }
   }
 }
@@ -139,7 +184,6 @@ void leerComandos() {
       cmdSerial += c;
     }
   }
-
   while (BT.available()) {
     char c = BT.read();
     if (c == '\n') {
@@ -152,36 +196,16 @@ void leerComandos() {
 
 void loop() {
   if (IrReceiver.decode()) {
-    if (!(IrReceiver.decodedIRData.flags & IRDATA_FLAGS_IS_REPEAT) && modoScan) {
+    if (!(IrReceiver.decodedIRData.flags & IRDATA_FLAGS_IS_REPEAT)) {
       if (IrReceiver.decodedIRData.protocol != UNKNOWN) {
         unsigned long valor = IrReceiver.decodedIRData.decodedRawData;
         if (valor != 0 && valor != 0xFFFFFFFF) {
           ultimoIR = valor;
           enviar("IR:" + String(ultimoIR, HEX));
-          modoScan = false;
         }
       }
     }
     IrReceiver.resume();
-  }
-
-  uint8_t buf[RH_ASK_MAX_MESSAGE_LEN];
-  uint8_t buflen = sizeof(buf);
-  if (modoScan && rf_driver.recv(buf, &buflen)) {
-    if (buflen > 0) {
-      buf[buflen] = '\0';
-      String msg = String((char*)buf);
-      msg.trim();
-      if (msg != "") {
-        ultimoRF = msg;
-        enviar("RF:" + msg);
-        modoScan = false;
-      }
-    }
-  }
-
-  if (modoScan && millis() - scanInicio > SCAN_TIMEOUT) {
-    modoScan = false;
   }
 
   leerComandos();
