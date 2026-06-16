@@ -1,15 +1,9 @@
-/*
-  SMART CONTROLLER - Arduino
-  USB (Serial) + Bluetooth (HC-05)
-  IR (receiver + sender) + RF 433MHz (RCSwitch)
-*/
-
 #define IR_RECEIVE_PIN  8
 #define IR_SEND_PIN     9
 #define PIN_RCSWITCH_RX 2
 #define PIN_RCSWITCH_TX 4
-#define BT_RX          6
-#define BT_TX          7
+#define BT_RX           6
+#define BT_TX           7
 
 #define DECODE_NEC
 #define DECODE_SONY
@@ -29,13 +23,15 @@ SoftwareSerial BT(BT_RX, BT_TX);
 unsigned long ultimoIR = 0;
 int ultimoIRProto = NEC;
 unsigned int ultimoIRBits = 32;
-uint8_t irRawTicks[200];
-uint8_t irRawLen = 0;
-uint8_t irRawKhz = 38;
 unsigned long ultimoRF = 0;
 unsigned int ultimoRFBits = 0;
 unsigned int ultimoRFProto = 0;
 unsigned int ultimoRFDelay = 0;
+
+uint8_t irRawTicks[200];
+uint8_t irRawLen = 0;
+uint8_t irRawKhz = 38;
+
 const unsigned long SCAN_TIMEOUT = 10000;
 
 void enviar(String msg) {
@@ -54,45 +50,52 @@ void setup() {
   rf.enableTransmit(PIN_RCSWITCH_TX);
   rf.setReceiveTolerance(90);
 
-  delay(1000);
-  Serial.flush();
+  delay(500);
   while (Serial.available()) Serial.read();
   while (BT.available()) BT.read();
 
   enviar("OK:INICIADO");
 }
 
+void guardarRawIR() {
+  irRawLen = IrReceiver.decodedIRData.rawlen - 1;
+  IrReceiver.compensateAndStoreIRResultInArray(irRawTicks);
+  switch (ultimoIRProto) {
+    case SONY:
+      irRawKhz = 40; break;
+    case RC5: case RC6:
+      irRawKhz = 36; break;
+    default:
+      irRawKhz = 38; break;
+  }
+}
+
 void enviarIR(unsigned long codigo, int proto = NEC, unsigned int bits = 32) {
   if (irRawLen > 0 && ultimoIR == codigo && ultimoIRProto == proto && ultimoIRBits == bits) {
     IrSender.sendRaw(irRawTicks, irRawLen, irRawKhz);
-    delay(100);
+    delay(80);
     IrSender.sendRaw(irRawTicks, irRawLen, irRawKhz);
   } else {
+    uint16_t address = (codigo >> 16) & 0xFFFF;
+    uint16_t command = codigo & 0xFFFF;
     switch (proto) {
       case NEC:
-        IrSender.sendNECRaw(codigo, 3);
-        break;
-      case SONY:
-        IrSender.sendSonyMSB(codigo, bits ? bits : 12);
-        break;
-      case RC5:
-        IrSender.sendRC5(codigo, bits ? bits : 12);
-        break;
-      case RC6:
-        IrSender.sendRC6((uint32_t)codigo, bits ? bits : 20);
-        break;
+        IrSender.sendNEC(address, command, 0); break;
       case SAMSUNG:
-        IrSender.sendSamsungMSB(codigo, bits ? bits : 32);
-        break;
+        IrSender.sendSamsung(address, command, 0); break;
+      case SONY:
+        IrSender.sendSony(address, (uint8_t)command, 0, bits ? bits : 12); break;
+      case RC5:
+        IrSender.sendRC5((uint8_t)address, (uint8_t)command, 0); break;
+      case RC6:
+        IrSender.sendRC6((uint8_t)address, (uint8_t)command, 0); break;
       case LG:
-        IrSender.sendLG(codigo, bits ? bits : 28);
-        break;
+        IrSender.sendLG((uint8_t)address, command, 0); break;
       case JVC:
-        IrSender.sendJVCMSB(codigo, bits ? bits : 16, false);
-        break;
+        IrSender.sendJVC((uint8_t)address, (uint8_t)command, 0); break;
       default:
-        IrSender.sendNECRaw(codigo, 3);
-        break;
+        enviar("ERROR:Protocolo IR no soportado");
+        return;
     }
     irRawLen = 0;
   }
@@ -119,142 +122,83 @@ void procesar(String cmd) {
 
   if (cmd == "TEST") {
     enviar("OK:TEST");
-  }
-  else if (cmd == "TEST_IR") {
-    IrSender.sendNECRaw(0x00FFA25D, 3);
-    enviar("OK:TEST_IR enviado (0xFFA25D x4)");
-  }
-  else if (cmd == "TEST_IR_MSB") {
-    IrSender.sendNECMSB(0x00FFA25D, 32, false);
-    enviar("OK:TEST_IR_MSB enviado");
-  }
-  else if (cmd == "SEND_IR") {
-    if (ultimoIR == 0) {
-      enviar("ERROR:No hay codigo IR capturado");
-    } else {
-      enviarIR(ultimoIR, ultimoIRProto, ultimoIRBits);
-    }
-  }
-  else if (cmd == "SEND_RF") {
-    if (ultimoRF == 0) {
-      enviar("ERROR:No hay codigo RF capturado");
-    } else {
-      enviarRF(ultimoRF, ultimoRFBits, ultimoRFProto, ultimoRFDelay);
-    }
-  }
-  else if (cmd.startsWith("SCAN")) {
+
+  } else if (cmd == "TEST_IR") {
+    IrSender.sendNEC(0x00FF, 0xA25D, 0);
+    enviar("OK:TEST_IR enviado");
+
+  } else if (cmd == "SEND_IR") {
+    if (ultimoIR == 0) enviar("ERROR:No hay codigo IR capturado");
+    else enviarIR(ultimoIR, ultimoIRProto, ultimoIRBits);
+
+  } else if (cmd == "SEND_RF") {
+    if (ultimoRF == 0) enviar("ERROR:No hay codigo RF capturado");
+    else enviarRF(ultimoRF, ultimoRFBits, ultimoRFProto, ultimoRFDelay);
+
+  } else if (cmd.startsWith("SCAN")) {
     ultimoIR = 0;
     ultimoRF = 0;
     irRawLen = 0;
-
-    Serial.println("OK:SCAN_LISTENING");
-    Serial.println("DEBUG:SCAN_INICIADO");
-
+    enviar("OK:SCAN_LISTENING");
     unsigned long inicio = millis();
     unsigned long lastDebug = 0;
-
     while (true) {
       if (rf.available()) {
-        unsigned long valor = rf.getReceivedValue();
-        unsigned int bits = rf.getReceivedBitlength();
-        unsigned int proto = rf.getReceivedProtocol();
+        unsigned long v = rf.getReceivedValue();
+        unsigned int b = rf.getReceivedBitlength();
+        unsigned int p = rf.getReceivedProtocol();
         unsigned int d = rf.getReceivedDelay();
         rf.resetAvailable();
-
-        if (valor != 0 && bits > 0) {
-          ultimoRF = valor;
-          ultimoRFBits = bits;
-          ultimoRFProto = proto;
-          ultimoRFDelay = d;
-          Serial.print("RF:");
-          Serial.print(ultimoRF);
-          Serial.print(",");
-          Serial.print(ultimoRFBits);
-          Serial.print(",");
-          Serial.print(ultimoRFProto);
-          Serial.print(",");
-          Serial.println(ultimoRFDelay);
+        if (v != 0 && b > 0) {
+          ultimoRF = v; ultimoRFBits = b; ultimoRFProto = p; ultimoRFDelay = d;
+          enviar("RF:" + String(v) + "," + String(b) + "," + String(p) + "," + String(d));
         }
       }
-
       if (IrReceiver.decode()) {
         if (!(IrReceiver.decodedIRData.flags & IRDATA_FLAGS_IS_REPEAT)) {
           if (IrReceiver.decodedIRData.protocol != UNKNOWN) {
             unsigned long valor = IrReceiver.decodedIRData.decodedRawData;
+            unsigned int bits = IrReceiver.decodedIRData.numberOfBits;
+            int proto = IrReceiver.decodedIRData.protocol;
             if (valor != 0 && valor != 0xFFFFFFFF) {
-              ultimoIR = valor;
-              ultimoIRProto = IrReceiver.decodedIRData.protocol;
-              ultimoIRBits = IrReceiver.decodedIRData.numberOfBits;
-
-              irRawLen = IrReceiver.decodedIRData.rawlen - 1;
-              for (uint8_t i = 0; i < irRawLen && i < 200; i++) {
-                irRawTicks[i] = IrReceiver.irparams.rawbuf[i + 1];
-              }
-              switch (ultimoIRProto) {
-                case NEC: case SAMSUNG: case LG: case JVC:
-                  irRawKhz = 38; break;
-                case SONY:
-                  irRawKhz = 40; break;
-                case RC5: case RC6:
-                  irRawKhz = 36; break;
-                default:
-                  irRawKhz = 38; break;
-              }
-
-              Serial.print("IR:");
-              Serial.print(ultimoIR, HEX);
-              Serial.print(",");
-              Serial.print(ultimoIRProto);
-              Serial.print(",");
-              Serial.println(ultimoIRBits);
+              ultimoIR = valor; ultimoIRProto = proto; ultimoIRBits = bits;
+              guardarRawIR();
+              String irStr = String(ultimoIR, HEX); irStr.toUpperCase();
+              enviar("IR:" + irStr + "," + String(proto) + "," + String(bits));
             }
           }
         }
         IrReceiver.resume();
       }
-
       if (millis() - inicio > SCAN_TIMEOUT) {
-        Serial.println("DEBUG:SCAN_TIMEOUT");
-        break;
+        enviar("DEBUG:SCAN_TIMEOUT"); break;
       }
-
-      if (millis() - lastDebug > 3000) {
-        lastDebug = millis();
-        Serial.println("DEBUG:ESPERANDO_RF...");
-      }
+      if (millis() - lastDebug > 3000) { lastDebug = millis(); enviar("DEBUG:ESPERANDO_RF..."); }
     }
-  }
-  else if (cmd.startsWith("IR:")) {
+
+  } else if (cmd.startsWith("IR:")) {
     String resto = cmd.substring(3);
     unsigned long codigo;
     int proto = ultimoIRProto;
     unsigned int bits = ultimoIRBits;
-
     int c1 = resto.indexOf(',');
     if (c1 > 0) {
       codigo = strtoul(resto.substring(0, c1).c_str(), NULL, 16);
       int c2 = resto.indexOf(',', c1 + 1);
-      if (c2 > 0) {
-        proto = resto.substring(c1 + 1, c2).toInt();
-        bits = (unsigned int)resto.substring(c2 + 1).toInt();
-      }
+      if (c2 > 0) { proto = resto.substring(c1 + 1, c2).toInt(); bits = (unsigned int)resto.substring(c2 + 1).toInt(); }
     } else {
       codigo = strtoul(resto.c_str(), NULL, 16);
     }
+    if (codigo == 0 || codigo == 0xFFFFFFFF) enviar("ERROR:Codigo IR invalido");
+    else enviarIR(codigo, proto, bits);
 
-    if (codigo == 0 || codigo == 0xFFFFFFFF) {
-      enviar("ERROR:Codigo IR invalido");
-    } else {
-      enviarIR(codigo, proto, bits);
-    }
-  }
-  else if (cmd.startsWith("RF:")) {
+  } else if (cmd.startsWith("RF:")) {
     unsigned long codigo = strtoul(cmd.substring(3).c_str(), NULL, 10);
-    if (codigo == 0) {
-      enviar("ERROR:Codigo RF invalido");
-    } else {
-      enviarRF(codigo, ultimoRFBits, ultimoRFProto, ultimoRFDelay);
-    }
+    if (codigo == 0) enviar("ERROR:Codigo RF invalido");
+    else enviarRF(codigo, ultimoRFBits, ultimoRFProto, ultimoRFDelay);
+
+  } else if (cmd == "SEND_IR_POWER") {
+    enviarIR(0x70002, 19, 32);
   }
 }
 
@@ -264,19 +208,13 @@ String cmdBT = "";
 void leerComandos() {
   while (Serial.available()) {
     char c = Serial.read();
-    if (c == '\n') {
-      if (cmdSerial.length() > 0) { procesar(cmdSerial); cmdSerial = ""; }
-    } else if (c != '\r') {
-      cmdSerial += c;
-    }
+    if (c == '\n') { if (cmdSerial.length() > 0) { procesar(cmdSerial); cmdSerial = ""; } }
+    else if (c != '\r') cmdSerial += c;
   }
   while (BT.available()) {
     char c = BT.read();
-    if (c == '\n') {
-      if (cmdBT.length() > 0) { procesar(cmdBT); cmdBT = ""; }
-    } else if (c != '\r') {
-      cmdBT += c;
-    }
+    if (c == '\n') { if (cmdBT.length() > 0) { procesar(cmdBT); cmdBT = ""; } }
+    else if (c != '\r') cmdBT += c;
   }
 }
 
@@ -285,32 +223,17 @@ void loop() {
     if (!(IrReceiver.decodedIRData.flags & IRDATA_FLAGS_IS_REPEAT)) {
       if (IrReceiver.decodedIRData.protocol != UNKNOWN) {
         unsigned long valor = IrReceiver.decodedIRData.decodedRawData;
+        unsigned int bits = IrReceiver.decodedIRData.numberOfBits;
+        int proto = IrReceiver.decodedIRData.protocol;
         if (valor != 0 && valor != 0xFFFFFFFF) {
-          ultimoIR = valor;
-          ultimoIRProto = IrReceiver.decodedIRData.protocol;
-          ultimoIRBits = IrReceiver.decodedIRData.numberOfBits;
-
-          irRawLen = IrReceiver.decodedIRData.rawlen - 1;
-          for (uint8_t i = 0; i < irRawLen && i < 200; i++) {
-            irRawTicks[i] = IrReceiver.irparams.rawbuf[i + 1];
-          }
-          switch (ultimoIRProto) {
-            case NEC: case SAMSUNG: case LG: case JVC:
-              irRawKhz = 38; break;
-            case SONY:
-              irRawKhz = 40; break;
-            case RC5: case RC6:
-              irRawKhz = 36; break;
-            default:
-              irRawKhz = 38; break;
-          }
-
-          enviar("IR:" + String(ultimoIR, HEX) + "," + ultimoIRProto + "," + ultimoIRBits);
+          ultimoIR = valor; ultimoIRProto = proto; ultimoIRBits = bits;
+          guardarRawIR();
+          String irStr = String(ultimoIR, HEX); irStr.toUpperCase();
+          enviar("IR:" + irStr + "," + String(proto) + "," + String(bits));
         }
       }
     }
     IrReceiver.resume();
   }
-
   leerComandos();
 }
